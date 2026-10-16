@@ -10,7 +10,7 @@
 // After each toggle we re-send the last voice state packet so the change shows up for others at once.
 let ctl = null; // lets the settings tab talk to the running plugin
 
-blxstncord.definePlugin({
+(window.beecord || window.blxstncord).definePlugin({
     id: "voice",
     name: "Fake Mute / Deafen",
     description: "Adds one button (incognito icon) to the left of the real mic button. When it is red, everyone in the voice channel sees you muted and/or deafened while your mic and sound still work. Choose what it fakes below.",
@@ -261,14 +261,24 @@ blxstncord.definePlugin({
         }
 
         // ---------- finding the real buttons ----------
-        const MUTE_RE = /^(mute|unmute|wycisz|wyłącz wyciszenie|włącz wyciszenie)$/i;
-        const DEAF_RE = /^(deafen|undeafen|wyłącz dźwięk|włącz dźwięk|ogłusz|wyłącz ogłuszenie)$/i;
-        const usable = el => !el.hasAttribute("data-bc-btn") && !el.closest("#blxstncord-panel") && !el.closest('[role="dialog"],[aria-modal="true"]');
+        const MUTE_RE = /(?:^|\b)(mute|unmute|wycisz|wyciszenie)(?:\b|$)/i;
+        const DEAF_RE = /(?:^|\b)(deafen|undeafen|dźwięk|ogłuszenie|ogłusz)(?:\b|$)/i;
+        const usable = el => !el.hasAttribute("data-bc-btn") && !el.closest("#blxstncord-panel") && !el.closest("#beecord-panel") && !el.closest('[role="dialog"],[aria-modal="true"]');
 
         function findReal() {
             const labelled = [...document.querySelectorAll("[aria-label]")].filter(usable);
             let mute = labelled.find(e => MUTE_RE.test((e.getAttribute("aria-label") || "").trim()));
             let deaf = labelled.find(e => DEAF_RE.test((e.getAttribute("aria-label") || "").trim()));
+            if (!mute || !deaf) {
+                const panel = document.querySelector('section[class*="panels"], div[class*="accountProfile"], footer, [aria-label*="User area"]');
+                if (panel) {
+                    const btns = [...panel.querySelectorAll("button, [role='button'], [role='switch']")].filter(usable);
+                    if (!mute) mute = btns.find(e => MUTE_RE.test((e.getAttribute("aria-label") || "").trim()));
+                    if (!deaf) deaf = btns.find(e => DEAF_RE.test((e.getAttribute("aria-label") || "").trim()));
+                    if (!mute && btns.length >= 1) mute = btns[0];
+                    if (!deaf && btns.length >= 2) deaf = btns[1];
+                }
+            }
             if (!mute || !deaf) { // other languages: the first two switches in the user panel are mic and headphones
                 const sw = [...document.querySelectorAll('[role="switch"]')].filter(usable);
                 if (!mute && sw.length) mute = sw[0];

@@ -1,7 +1,7 @@
 // Custom CSS: write your own CSS in the settings tab, it applies instantly.
 let styleEl = null;
 
-blxstncord.definePlugin({
+(window.beecord || window.blxstncord).definePlugin({
     id: "custom-css",
     name: "Custom CSS",
     description: "Write your own CSS to restyle Discord. Applies live while you type.",

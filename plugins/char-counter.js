@@ -1,10 +1,10 @@
 // Character Counter: live counter while you type a message.
-blxstncord.definePlugin({
+(window.beecord || window.blxstncord).definePlugin({
     id: "char-counter",
     name: "Character Counter",
     description: "Shows a live character counter while you type a message (turns red above the limit).",
     author: "blxstncord",
-    version: "1.0.0",
+    version: "1.0.1",
     webpack: false,
 
     start(api) {
@@ -15,7 +15,9 @@ blxstncord.definePlugin({
         api.cleanup(() => el.remove());
 
         const update = () => {
-            const box = document.querySelector('[role="textbox"][data-slate-editor="true"]');
+            const box = (document.activeElement && document.activeElement.matches && document.activeElement.matches('[role="textbox"]') ? document.activeElement : null) ||
+                document.querySelector('[role="textbox"][data-slate-editor="true"]') ||
+                document.querySelector('[role="textbox"]');
             const text = box ? (box.innerText || "").replace(/[\uFEFF\u200B]/g, "").replace(/\n$/, "") : "";
             const n = text.length;
             const limit = api.settings.get("limit", 2000);

@@ -21,7 +21,7 @@
 //
 // HARD LIMIT: Discord sends exactly the same event when someone unfriends you and when someone blocks you.
 // There is no way for any client mod to tell them apart, so both are logged as "REMOVED / BLOCKED".
-blxstncord.definePlugin({
+(window.beecord || window.blxstncord).definePlugin({
     id: "friendship-notifier",
     name: "Friendship Notifier",
     description: "Logs + pop-up when someone removes/blocks you, sends you a friend request or withdraws it. Own tab in the Logs page.",
@@ -452,7 +452,20 @@ blxstncord.definePlugin({
         // ================================ REST poll ================================
         const tokenNow = () => {
             if (auth.token) return auth.token;
+            try {
+                const raw = window.localStorage && window.localStorage.getItem("token");
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (typeof parsed === "string" && parsed.length > 30) return (auth.token = parsed);
+                }
+            } catch { }
             try { const t = stores.auth && stores.auth.getToken(); if (typeof t === "string" && t.length > 30) return (auth.token = t); } catch { }
+            try {
+                const st = (api.webpack.find && api.webpack.find(o => o && typeof o.getToken === "function", 2)) ||
+                    (api.webpack.findByProps && api.webpack.findByProps(["getToken"], "getToken", "getId"));
+                const t = st && st.getToken();
+                if (typeof t === "string" && t.length > 30) return (auth.token = t);
+            } catch { }
             return null;
         };
         async function apiGet(path) {

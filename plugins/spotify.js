@@ -3,18 +3,18 @@
 // (loader.js runs media.ps1 for it while this plugin is on). No Spotify login or API key needed.
 let refreshSpotify = null;
 
-blxstncord.definePlugin({
+(window.beecord || window.blxstncord).definePlugin({
     id: "spotify",
     name: "Spotify Controls",
     description: "Now-playing card above your user bar: play/pause, next, previous, shuffle, repeat/loop, volume, progress and album cover.",
     author: "blxstncord",
-    version: "1.3.0",
+    version: "1.3.1",
     enabledByDefault: true,
     webpack: false,
 
     start(api) {
         const { h } = api.ui;
-        api.log("Spotify Controls v1.3.0 loaded (waveform seek bar)");
+        api.log("Spotify Controls loaded (waveform seek bar)");
         const NS = "http://www.w3.org/2000/svg";
         const PATH = {
             note: "M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z",
@@ -37,7 +37,7 @@ blxstncord.definePlugin({
             s.append(p);
             return s;
         };
-        const send = c => console.log("[blxstncord] cmd:media:" + c);
+        const send = c => console.log("[beecord] cmd:media:" + c);
         const fmt = ms => {
             const t = Math.max(0, Math.floor(ms / 1000));
             return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
@@ -483,7 +483,7 @@ blxstncord.definePlugin({
         refreshSpotify = render;
 
         // ---------- data from loader.js ----------
-        api.on(window, "blxstncord-media", e => {
+        const onMedia = e => {
             const d = e.detail || {};
             if (d.art !== undefined && d.art !== null) art = { key: d.artKey, src: String(d.art) };
             if (d.running === false) {
@@ -504,18 +504,20 @@ blxstncord.definePlugin({
                 };
             }
             render();
-        });
+        };
+        api.on(window, "beecord-media", onMedia);
+        api.on(window, "blxstncord-media", onMedia);
 
         // ---------- placing it above the user bar ----------
-        const MUTE_RE = /^(mute|unmute|wycisz|wyłącz wyciszenie|włącz wyciszenie)$/i;
-        const usable = el => !el.closest("#blxstncord-panel") && !el.closest('[role="dialog"],[aria-modal="true"]');
+        const MUTE_RE = /(?:^|\b)(mute|unmute|wycisz|wyciszenie)(?:\b|$)/i;
+        const usable = el => !el.closest("#blxstncord-panel") && !el.closest("#beecord-panel") && !el.closest('[role="dialog"],[aria-modal="true"]');
         function findBar() {
-            const sec = document.querySelector('section[class*="panels"]');
+            const sec = document.querySelector('section[class*="panels"], [aria-label*="User area"]');
             if (sec) return sec;
             const mute = [...document.querySelectorAll("[aria-label]")].filter(usable)
                 .find(e => MUTE_RE.test((e.getAttribute("aria-label") || "").trim()))
                 || [...document.querySelectorAll('[role="switch"]')].filter(usable)[0];
-            return mute ? mute.closest("section") : null;
+            return mute ? (mute.closest('section') || mute.closest('[class*="container_"]') || mute.parentElement) : null;
         }
         let placedLogged = false;
         function mount() {

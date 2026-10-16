@@ -11,19 +11,19 @@
 // So invisible users show nothing here, exactly as they show nothing in Vencord. This is a Discord
 // server-side rule, not a gap in the plugin.
 
-blxstncord.definePlugin({
+(window.beecord || window.blxstncord).definePlugin({
     id: "device-detector",
     name: "Device Detector",
     description: "Shows each user's device (PC / phone / browser / console) on their avatar, like Vencord's platform indicators. Reads Discord's PresenceStore; invisible users report no device.",
     author: "blxstncord",
-    version: "2.0.0",
+    version: "2.0.1",
     enabledByDefault: true,
     webpack: true,
 
     start(api) {
         const NS = "http://www.w3.org/2000/svg";
         const SNOW = /^\d{17,20}$/;
-        const STATUS_SEL = 'rect[mask*="svg-mask-status"]';
+        const STATUS_SEL = 'rect[mask*="status"], rect[mask*="Status"]';
         const ORDER = ["embedded", "mobile", "desktop", "web"];        // which icon wins when on several devices
         const LABEL = { desktop: "PC", mobile: "Phone", web: "Browser", embedded: "Console" };
         const STATUS_COLOR = { online: "#23a559", idle: "#f0b232", dnd: "#f23f42", streaming: "#593695" };
@@ -43,8 +43,10 @@ blxstncord.definePlugin({
         function findStore() {
             if (presence || stopped) return;
             try {
-                presence = api.webpack.findBy("presence-store", ["getStatus", "isMobileOnline"],
-                    o => typeof o.getStatus === "function" && typeof o.isMobileOnline === "function") || null;
+                presence = api.webpack.find(o => o && typeof o.getStatus === "function" && typeof o.isMobileOnline === "function", 1) ||
+                    api.webpack.find(o => o && typeof o.getState === "function" && typeof o.getStatus === "function", 1) ||
+                    (api.webpack.findByProps && api.webpack.findByProps(["isMobileOnline"], "getStatus", "isMobileOnline")) ||
+                    api.webpack.findBy("presence-store", ["isMobileOnline"], o => typeof o.getStatus === "function") || null;
             } catch (e) { api.log("PresenceStore search error: " + (e && e.message || e)); }
             if (presence) {
                 api.log("PresenceStore: found");
@@ -157,7 +159,7 @@ blxstncord.definePlugin({
             for (const rect of document.querySelectorAll(STATUS_SEL)) {
                 const svg = rect.ownerSVGElement;
                 if (!svg || !svg.querySelector("foreignObject")) continue;   // avatar dots only, not status-menu icons
-                const id = idFromImg(svg) || idFromFiber(rect);
+                const id = idFromImg(svg) || idFromFiber(rect) || idFromFiber(svg) || (svg.parentElement && idFromFiber(svg.parentElement));
                 if (!id) continue;
                 const inf = deviceInfo(id);
                 if (inf) paint(rect, inf); else restore(rect);

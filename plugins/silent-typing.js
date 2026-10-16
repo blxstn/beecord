@@ -1,6 +1,6 @@
 // Silent Typing: other people never see "is typing...".
 // Drops the "POST /channels/<id>/typing" request, so it does not depend on Discord's internal modules.
-blxstncord.definePlugin({
+(window.beecord || window.blxstncord).definePlugin({
     id: "typing",
     name: "Silent Typing",
     description: "Hides the \"is typing...\" indicator from other people while you type.",

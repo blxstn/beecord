@@ -8,7 +8,7 @@
 // api.on(target, event, fn, opts)   event listener, removed on stop
 // api.cleanup(fn)   your own cleanup, runs on stop
 // api.ui: h, toggle, row, note, chips, textarea   build the options UI
-blxstncord.definePlugin({
+(window.beecord || window.blxstncord).definePlugin({
     id: "my-plugin",            // unique, never change it later (settings are stored under it)
     name: "My Plugin",
     description: "What it does.",

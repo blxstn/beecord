@@ -4,20 +4,21 @@
 // Console helpers (Ctrl+Shift+I): blxstncord.plugins(), blxstncord.status(), blxstncord.open(), blxstncord.rescan()
 
 (() => {
-    if (window.blxstncord) return;
+    if (window.beecord || window.blxstncord) return;
 
     // ---------- config ----------
-    const KEY = "blxstncord_config_v2";
-    const LEGACY_KEY = "fakecord_config_v2"; // settings from before the rename
-    const OLD_KEY = "fakecord_config";
+    const KEY = "beecord_config_v1";
+    const LEGACY_KEY = "blxstncord_config_v2";
+    const OLD_KEY = "fakecord_config_v2";
 
     function loadConfig() {
         let saved = null;
         try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch { }
         if (!saved) { try { saved = JSON.parse(localStorage.getItem(LEGACY_KEY) || "null"); } catch { } }
-        if (!saved) { // migrate settings from the first blxstncord version
+        if (!saved) { try { saved = JSON.parse(localStorage.getItem(OLD_KEY) || "null"); } catch { } }
+        if (!saved) {
             let old = {};
-            try { old = JSON.parse(localStorage.getItem(OLD_KEY) || "{}"); } catch { }
+            try { old = JSON.parse(localStorage.getItem("fakecord_config") || "{}"); } catch { }
             saved = { enabled: { ...(old.enabled || {}) }, settings: {} };
             if (old.silentTyping === false) saved.enabled.typing = false;
             const v = {};
@@ -31,7 +32,7 @@
     const config = loadConfig();
     const save = () => { try { localStorage.setItem(KEY, JSON.stringify(config)); } catch { } };
 
-    const log = (...a) => console.log("[blxstncord] " + a.map(x => typeof x === "string" ? x : JSON.stringify(x)).join(" "));
+    const log = (...a) => console.log("[beecord] " + a.map(x => typeof x === "string" ? x : JSON.stringify(x)).join(" "));
     log("renderer injected, waiting for Discord to finish loading");
 
     // ---------- webpack access ----------
@@ -1213,7 +1214,7 @@
         tabOrigClass.plugins = ourTabs.plugins.className;
         tabOrigClass.logs = ourTabs.logs.className;
         tabOrigClass.credits = ourTabs.credits.className;
-        for (const el of [makeSeparator(found.container), makeHeader(found.container, "blxstncord"), ourTabs.plugins, ourTabs.logs, ourTabs.credits]) {
+        for (const el of [makeSeparator(found.container), makeHeader(found.container, "beecord"), ourTabs.plugins, ourTabs.logs, ourTabs.credits]) {
             parent.insertBefore(el, ref);
         }
         if (!tabLogged) { tabLogged = true; log("settings section added (found via " + found.mode + ")"); }
@@ -1224,7 +1225,7 @@
 
     function toast(msg) {
         if (!document.body) return;
-        const t = h("div", { id: "blxstncord-toast" }, msg);
+        const t = h("div", { id: "beecord-toast" }, msg);
         t.style.cssText = "position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100000;padding:8px 16px;" +
             "border-radius:8px;background:#23a559;color:#fff;font:600 13px sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.4);pointer-events:none";
         document.body.append(t);
@@ -1245,7 +1246,7 @@
     document.addEventListener("click", e => {
         if (!panel) return;
         const t = e.target;
-        if (!t || !t.closest || t.closest("#blxstncord-panel") || t.closest("[data-blxstncord-tab]")) return;
+        if (!t || !t.closest || t.closest("#blxstncord-panel") || t.closest("#beecord-panel") || t.closest("[data-blxstncord-tab]")) return;
         if (t.closest('[role="tab"]') || (panelLeft > 0 && sidebarEl && sidebarEl.contains(t))) closePanel();
     }, true);
     document.addEventListener("keydown", e => {
@@ -1259,14 +1260,14 @@
     });
 
     // ---------- public API ----------
-    window.blxstncord = {
+    window.beecord = {
         definePlugin,
         config: () => config,
         plugins: () => [...plugins.values()].map(p => ({ id: p.id, name: p.name, file: p.file, enabled: isEnabled(p), status: p.status })),
         status: () => Object.fromEntries([...plugins.values()].map(p => [p.id, p.status])),
         enable(id, value = true) { const p = plugins.get(id); if (p) { setEnabled(p, value); refreshPanel(); } return !!p; },
         open: () => openPanel(0, "plugins"),
-        openLogs: () => openPanel(0, "logs"),
+        openLogs: (view = "logs") => openPanel(0, view),
         rescan: () => log("cmd:rescan"),
         // used by loader.js:
         __file: null,
@@ -1285,13 +1286,14 @@
                 }
             }
             for (const f of Object.keys(loadErrors)) if (!files.includes(f)) delete loadErrors[f];
-            if (!toasted) { toasted = true; toast("blxstncord loaded: " + plugins.size + " plugins. Discord Settings > blxstncord (bottom of the left list)"); }
+            if (!toasted) { toasted = true; toast("beecord loaded: " + plugins.size + " plugins. Discord Settings > beecord"); }
             log("scan finished: " + plugins.size + " plugin(s) detected, " + Object.keys(loadErrors).length + " load error(s)");
             logChanges();
             lastSig = sig();
             refreshPanel();
         }
     };
+    window.blxstncord = window.beecord;
 
     // ---------- wait for Discord, then start plugins that need its modules (retrying until each one works) ----------
     let tries = 0;

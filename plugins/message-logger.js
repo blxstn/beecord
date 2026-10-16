@@ -27,7 +27,7 @@ let blxMsgLog = null; // lets the settings tab talk to the running plugin
 let blxMsgLogWhy = ""; // why the plugin could not start (shown in its settings)
 let blxMsgLogNote = ""; // extra info shown in the settings while it runs
 
-blxstncord.definePlugin({
+(window.beecord || window.blxstncord).definePlugin({
     id: "message-logger",
     name: "Message Logger",
     description: "Keeps deleted messages and their media visible (red, DELETED) in DMs and servers, and lists them in the Logs tab until you clear them.",
@@ -186,10 +186,13 @@ blxstncord.definePlugin({
         }
 
         // ---------- log storage ----------
+        const storage = typeof window !== "undefined" && window.localStorage ? window.localStorage : (typeof localStorage !== "undefined" ? localStorage : null);
+        const getStored = k => { try { return storage ? storage.getItem(k) : null; } catch { return null; } };
+        const setStored = (k, v) => { try { if (storage) storage.setItem(k, v); } catch { } };
         let log = [];
-        try { const v = JSON.parse(localStorage.getItem(BLX_MSGLOG_KEY) || "[]"); if (Array.isArray(v)) log = v.filter(r => r && r.id && r.ch); } catch { }
+        try { const v = JSON.parse(getStored(BLX_MSGLOG_KEY) || "[]"); if (Array.isArray(v)) log = v.filter(r => r && r.id && r.ch); } catch { }
         for (const r of log) { r.attachments = r.attachments || []; r.links = r.links || []; }
-        const save = () => { try { localStorage.setItem(BLX_MSGLOG_KEY, JSON.stringify(log)); } catch (e) { api.log("cannot save log: " + e.message); } };
+        const save = () => { try { setStored(BLX_MSGLOG_KEY, JSON.stringify(log)); } catch (e) { api.log("cannot save log: " + e.message); } };
         const logged = new Set(log.map(r => r.id));
         const changed = () => { try { api.logs && api.logs.refresh(); } catch { } };
         for (const r of log) for (const a of r.attachments) if (a.key) loadObjUrl(a).then(u => { if (u) changed(); });
@@ -446,6 +449,9 @@ blxstncord.definePlugin({
         }, ms));
         api.cleanup(() => watchdog.forEach(clearTimeout));
 
+        // ---------- gateway tap (used when the dispatcher cannot be found) ----------
+        let tapSeen = 0;
+
         const report = () => api.log("self-check: hooked dispatchers=" + attached.length + ", actions seen=" + stats.actions +
             ", MESSAGE_CREATE per dispatcher=[" + hits.join(", ") + "], gateway tap packets=" + tapSeen + ", real message events=" + stats.msgEvents +
             ", store watcher " + (stats.storeListener ? "listening" : "polling") + ", deletes found by it=" + stats.viaStore + ", " + cache.size + " cached, stats " + JSON.stringify(stats) +
@@ -453,8 +459,6 @@ blxstncord.definePlugin({
         const t0 = setTimeout(report, 6000), t1 = setTimeout(report, 20000), t2 = setTimeout(report, 90000);
         api.cleanup(() => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); });
 
-        // ---------- gateway tap (used when the dispatcher cannot be found) ----------
-        let tapSeen = 0;
         function tapHandle(r) {
             const t = r.t, d = r.d;
             if (!d || typeof d !== "object") return;
@@ -592,7 +596,7 @@ blxstncord.definePlugin({
             const out = new Map();
             for (const ol of document.querySelectorAll('[data-list-id="chat-messages"]')) {
                 for (const li of ol.children) {
-                    const mm = NATIVE.exec(li.id || "");
+                    const mm = NATIVE.exec(li.id || "") || NATIVE.exec(li.getAttribute("data-list-item-id") || "");
                     if (!mm) continue;
                     const ch = mm[1], id = mm[2];
                     let e = out.get(ch); if (!e) out.set(ch, e = { ids: new Set(), gid: gidOf(ch) });

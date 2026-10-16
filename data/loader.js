@@ -1,11 +1,7 @@
-// blxstncord loader: runs in Discord's main process.
-// It only reads files from its own folder (renderer.js + plugins/*.js) and runs them in Discord's window.
-// No network access. It writes a small log.txt next to itself so you can see what happened.
-// Only while the "Spotify Controls" plugin is on, it also runs media.ps1 (a hidden local PowerShell helper that
-// talks to the Windows media controls) and relays play/pause/next/previous/shuffle/repeat/volume between the page and that helper.
-//
-// Plugin detection: every plugins/*.js file (not starting with "_") is injected on startup and
-// whenever you press "Rescan plugins" in the blxstncord settings tab.
+// beecord loader: runs in Discord's main process.
+// It reads files from its own folder (renderer.js + plugins/*.js) and runs them in Discord's window.
+// Writes log.txt next to itself so you can see what happened.
+// Runs media.ps1 for the "Spotify Controls" plugin to bridge Windows media controls.
 
 const { app, shell } = require("electron");
 const { spawn } = require("child_process");
@@ -45,23 +41,53 @@ async function injectPlugins(wc) {
             catch (e) { log("cannot read " + f + ": " + e); continue; }
             const name = JSON.stringify(f);
             const wrapped =
-                `(function(){const blxstncord=window.blxstncord;if(!blxstncord)return;blxstncord.__file=${name};` +
-                `try{\n${code}\n}catch(e){blxstncord.__pluginError(${name},e)}finally{blxstncord.__file=null}})();`;
+                `(function(){\n` +
+                `const beecord = window.beecord || window.blxstncord;\n` +
+                `const blxstncord = beecord;\n` +
+                `if (!beecord) return;\n` +
+                `beecord.__file = ${name};\n` +
+                `try {\n${code}\n} catch(e) {\n` +
+                `  beecord.__pluginError(${name}, e);\n` +
+                `} finally {\n` +
+                `  beecord.__file = null;\n` +
+                `}\n` +
+                `})();`;
             try {
                 await wc.executeJavaScript(wrapped);
             } catch (e) {
                 log("plugin " + f + " failed to parse/run: " + e);
-                await wc.executeJavaScript(`window.blxstncord&&window.blxstncord.__pluginError(${name},${JSON.stringify(String(e && e.message || e))})`).catch(() => { });
+                await wc.executeJavaScript(`(window.beecord||window.blxstncord)&&(window.beecord||window.blxstncord).__pluginError(${name},${JSON.stringify(String(e && e.message || e))})`).catch(() => { });
             }
         }
         if (!wc.isDestroyed()) {
-            await wc.executeJavaScript(`window.blxstncord&&window.blxstncord.__finishScan(${JSON.stringify(files)},${JSON.stringify(pluginsDir)})`);
+            await wc.executeJavaScript(`(window.beecord||window.blxstncord)&&(window.beecord||window.blxstncord).__finishScan(${JSON.stringify(files)},${JSON.stringify(pluginsDir)})`);
         }
     } catch (e) {
         log("plugin injection error: " + e);
     } finally {
         scanning = false;
     }
+}
+
+// ---------- live reload of the plugins folder ----------
+const pages = new Set();
+let hotTimer = null;
+function hotReload() {
+    clearTimeout(hotTimer);
+    hotTimer = setTimeout(async () => {
+        for (const wc of [...pages]) {
+            if (wc.isDestroyed()) { pages.delete(wc); continue; }
+            if (scanning) { hotReload(); return; }
+            await injectPlugins(wc);
+        }
+    }, 800);
+}
+let pluginWatcher = null;
+try {
+    pluginWatcher = fs.watch(pluginsDir, () => hotReload());
+    log("watching the plugins folder for changes");
+} catch (e) {
+    log("cannot watch the plugins folder: " + e.message);
 }
 
 // ---------- media bridge (Spotify Controls plugin) ----------
@@ -76,12 +102,15 @@ function mediaSend(wc, o) {
     if (wc.isDestroyed()) { mediaClients.delete(wc); return; }
     const out = Object.assign({}, o);
     delete out.art;
-    if (mediaArtKey !== null && mediaArtSeen.get(wc) !== mediaArtVer) {   // the cover is big, send it only when it changed
+    if (mediaArtKey !== null && mediaArtSeen.get(wc) !== mediaArtVer) {
         out.art = mediaArt;
         mediaArtSeen.set(wc, mediaArtVer);
     }
     out.artKey = mediaArtKey;
-    wc.executeJavaScript(`window.dispatchEvent(new CustomEvent("blxstncord-media",{detail:${JSON.stringify(out)}}))`).catch(() => { });
+    wc.executeJavaScript(
+        `window.dispatchEvent(new CustomEvent("beecord-media",{detail:${JSON.stringify(out)}}));` +
+        `window.dispatchEvent(new CustomEvent("blxstncord-media",{detail:${JSON.stringify(out)}}));`
+    ).catch(() => { });
 }
 
 function mediaOnLine(line) {
@@ -98,7 +127,7 @@ function mediaOnLine(line) {
 
 function mediaStart() {
     if (mediaProc) return;
-    if (!fs.existsSync(mediaScript)) { log("media: media.ps1 is missing, run install.bat again"); return; }
+    if (!fs.existsSync(mediaScript)) { log("media: media.ps1 is missing in " + __dirname); return; }
     try { for (const f of fs.readdirSync(__dirname).filter(f => /^media-.*\.cmd$/.test(f))) fs.unlinkSync(path.join(__dirname, f)); } catch { }
     mediaBuf = "";
     let p;
@@ -130,7 +159,6 @@ function mediaStopProc() {
     if (p) { try { p.kill(); } catch { } }
 }
 
-// "cmd:media:start|stop|toggle|next|prev|seek:<ms>|shuffle:on|off|repeat:none|track|list|volume:<0-100>|mute:on|off" coming from the page. Anything else is ignored.
 function mediaCommand(wc, msg) {
     const m = /cmd:media:([a-z]+(?::(?:\d{1,9}|[a-z]{2,5}))?)(?![\w:])/.exec(msg);
     if (!m) return;
@@ -154,21 +182,25 @@ function mediaCommand(wc, msg) {
 app.on("will-quit", mediaStopProc);
 
 app.on("browser-window-created", (_event, win) => {
-    // Messages from the page console: copy [blxstncord] lines into log.txt, and handle commands from the settings tab
+    pages.add(win.webContents);
+
     win.webContents.on("console-message", (...args) => {
         const msg = typeof args[2] === "string" ? args[2] : (args[0] && args[0].message);
-        if (typeof msg !== "string" || !msg.includes("[blxstncord]")) return;
+        if (typeof msg !== "string" || (!msg.includes("[beecord]") && !msg.includes("[blxstncord]"))) return;
         if (msg.includes("cmd:rescan")) { injectPlugins(win.webContents); return; }
         if (msg.includes("cmd:open-folder")) { shell.openPath(pluginsDir); return; }
         if (msg.includes("cmd:media:")) { mediaCommand(win.webContents, msg); return; }
         log(msg);
     });
 
-    win.webContents.on("destroyed", () => mediaClients.delete(win.webContents));
+    win.webContents.on("destroyed", () => {
+        mediaClients.delete(win.webContents);
+        pages.delete(win.webContents);
+    });
 
     win.webContents.on("dom-ready", async () => {
         try {
-            mediaArtSeen.delete(win.webContents);   // a reloaded page has no cover yet
+            mediaArtSeen.delete(win.webContents);
             const url = win.webContents.getURL();
             if (!/discord\.com/.test(url)) return;
             log("injecting into " + url);

@@ -1,7 +1,6 @@
-// blxstncord auto-updater: tiny background script (started at Windows login).
+// beecord auto-updater: background script (started at Windows login).
 // Every few seconds it checks whether the newest Discord version is still patched.
 // After a Discord update the new app-x.y.z folder is clean, so it re-applies the patch.
-// The patch takes effect the next time Discord starts. Optional: automatic restart (see updater.json).
 //
 //   node watcher.js          -> run forever (what the startup entry does)
 //   node watcher.js --once   -> check once and exit
@@ -10,13 +9,14 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync, spawn } = require("child_process");
 
-const MARKER = "/*BLXSTNCORD*/";
+const MARKER = "/*BEECORD*/";
+const LEGACY_MARKER = "/*BLXSTNCORD*/";
 const discordDir = path.join(process.env.LOCALAPPDATA || "", "Discord");
-const dataDir = path.join(process.env.APPDATA || "", "blxstncord");
+const dataDir = path.join(process.env.APPDATA || "", "beecord");
 const loaderPath = path.join(dataDir, "loader.js");
 const pidFile = path.join(dataDir, "watcher.pid");
 const logFile = path.join(dataDir, "updater.log");
-const cfgFile = path.join(dataDir, "updater.json");   // { "restartDiscord": true } restarts Discord right after patching
+const cfgFile = path.join(dataDir, "updater.json");
 const INTERVAL = 10000;
 
 function log(m) {
@@ -74,14 +74,14 @@ function restartDiscord() {
 
 // Patches the newest Discord version if needed. Returns true when it changed something.
 function check() {
-    if (!fs.existsSync(loaderPath)) return false;          // blxstncord was uninstalled
+    if (!fs.existsSync(loaderPath)) return false;          // beecord was uninstalled
     const files = findCoreFiles();
     if (!files.length) return false;
     const file = files[0];
     let original;
     try { original = fs.readFileSync(file, "utf8"); } catch { return false; }
-    if (!original || original.startsWith(MARKER)) return false;   // empty (still being written) or already patched
-    fs.writeFileSync(file + ".blxstncord.bak", original);
+    if (!original || original.startsWith(MARKER) || original.startsWith(LEGACY_MARKER)) return false;   // already patched
+    fs.writeFileSync(file + ".beecord.bak", original);
     fs.writeFileSync(file, `${MARKER}\nrequire(${JSON.stringify(loaderPath)});\n${original}`);
     log("patched new Discord version: " + file);
     return true;
