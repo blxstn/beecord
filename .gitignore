@@ -1,24 +1,11 @@
-# Logs
-*.log
+# Runtime logs & temporary files
 log.txt
 updater.log
-
-# Process & runtime files
-*.pid
+counter.json
+install-id.txt
 watcher.pid
-
-# Archives
-*.zip
-
-# Operating System files
-Thumbs.db
-ehthumbs.db
-[Dd]esktop.ini
-.DS_Store
-
-# Node / Dependencies (if applicable)
+version.json
+inbox/
+*.bak
+*.tmp
 node_modules/
-
-# IDE files
-.vscode/
-.idea/

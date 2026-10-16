@@ -13,20 +13,23 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+set "SCRIPT=install.js"
+if not exist "%SCRIPT%" if exist "data\install.js" set "SCRIPT=data\install.js"
+
 if "%~1"=="uninstall" (
-    node data\install.js uninstall
+    node "%SCRIPT%" uninstall
     pause
     exit /b 0
 )
 
 if "%~1"=="log" (
-    node data\install.js log
+    node "%SCRIPT%" log
     pause
     exit /b 0
 )
 
 if "%~1"=="install" (
-    node data\install.js install
+    node "%SCRIPT%" install
     pause
     exit /b 0
 )
@@ -47,19 +50,19 @@ set /p "CHOICE=Wybierz opcje (1-4) [domyslnie 1]: "
 
 if "%CHOICE%"=="1" (
     echo.
-    node data\install.js install
+    node "%SCRIPT%" install
 ) else if "%CHOICE%"=="2" (
     echo.
-    node data\install.js uninstall
+    node "%SCRIPT%" uninstall
 ) else if "%CHOICE%"=="3" (
     echo.
-    node data\install.js log
+    node "%SCRIPT%" log
 ) else if "%CHOICE%"=="4" (
     exit /b 0
 ) else (
     echo.
     echo [INFO] Wybrano domyslna opcje (Instalacja)...
-    node data\install.js install
+    node "%SCRIPT%" install
 )
 
 echo.

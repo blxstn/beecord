@@ -143,20 +143,7 @@ function syncWithGitHub() {
     if (isSyncing) return;
     isSyncing = true;
     try {
-        // 1. Sprawdz czy repo istnieje w AppData, jesli nie - skloniuj
-        if (!fs.existsSync(path.join(repoDir, ".git"))) {
-            log("Inicjalizacja lokalnego repo w AppData...");
-            try {
-                fs.mkdirSync(repoDir, { recursive: true });
-                execSync(`git clone --depth 1 ${REPO_URL} "${repoDir}"`, { windowsHide: true, stdio: "ignore" });
-            } catch (e) {
-                log("Blad klonowania repo: " + e.message);
-                isSyncing = false;
-                return;
-            }
-        }
-
-        // 2. Pobierz najnowszy commit z GitHuba
+        // 1. Pobierz najnowszy commit z GitHuba
         let remoteCommit = "";
         try {
             const out = execSync(`git ls-remote ${REPO_URL} HEAD`, { encoding: "utf8", windowsHide: true }).trim();
@@ -171,60 +158,22 @@ function syncWithGitHub() {
             return;
         }
 
-        // 3. Sprawdz aktualny lokalny commit
+        // 2. Sprawdz aktualny lokalny commit w %APPDATA%\beecord
         let localCommit = "";
         try {
-            if (fs.existsSync(versionFile)) {
-                const v = JSON.parse(fs.readFileSync(versionFile, "utf8"));
-                localCommit = v.commit || "";
-            }
+            localCommit = execSync("git rev-parse HEAD", { cwd: dataDir, encoding: "utf8", windowsHide: true }).trim();
         } catch { }
-
-        if (!localCommit) {
-            try {
-                localCommit = execSync("git rev-parse HEAD", { cwd: repoDir, encoding: "utf8", windowsHide: true }).trim();
-            } catch { }
-        }
 
         if (remoteCommit === localCommit) {
             isSyncing = false;
             return;
         }
 
-        log(`[Auto-Update] Wykryto nowa wersje na GitHubie (${remoteCommit.substring(0, 7)}). Pobieranie...`);
+        log(`[Auto-Update] Wykryto nowa wersje na GitHubie (${remoteCommit.substring(0, 7)}). Pobieranie git pull...`);
 
-        // 4. Pobierz zmiany do repozytorium w AppData
-        execSync("git fetch --depth 1 origin main", { cwd: repoDir, windowsHide: true, stdio: "ignore" });
-        execSync("git reset --hard origin/main", { cwd: repoDir, windowsHide: true, stdio: "ignore" });
-
-        // 5. Wgraj zaktualizowane pluginy i pliki core bezposrednio do %APPDATA%\beecord
-        const repoPlugins = path.join(repoDir, "plugins");
-        if (fs.existsSync(repoPlugins)) {
-            fs.mkdirSync(pluginsDir, { recursive: true });
-            for (const f of fs.readdirSync(repoPlugins)) {
-                if (f.endsWith(".js")) {
-                    fs.copyFileSync(path.join(repoPlugins, f), path.join(pluginsDir, f));
-                }
-            }
-        }
-
-        const repoData = path.join(repoDir, "data");
-        if (fs.existsSync(repoData)) {
-            for (const f of fs.readdirSync(repoData)) {
-                fs.copyFileSync(path.join(repoData, f), path.join(dataDir, f));
-            }
-        }
-
-        for (const extra of ["beecord.ico", "installer.exe"]) {
-            const src = path.join(repoDir, extra);
-            if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dataDir, extra));
-        }
-
-        // 6. Zapisz nowa wersje
-        fs.writeFileSync(versionFile, JSON.stringify({
-            commit: remoteCommit,
-            updatedAt: new Date().toISOString()
-        }, null, 2));
+        // 3. Pobierz zmiany bezposrednio w %APPDATA%\beecord
+        execSync("git fetch origin main", { cwd: dataDir, windowsHide: true, stdio: "ignore" });
+        execSync("git reset --hard origin/main", { cwd: dataDir, windowsHide: true, stdio: "ignore" });
 
         log(`[Auto-Update] Beecord zaktualizowany do ${remoteCommit.substring(0, 7)}!`);
 
