@@ -15,7 +15,7 @@ let ctl = null; // lets the settings tab talk to the running plugin
     name: "Fake Mute / Deafen",
     description: "Adds one button (incognito icon) to the left of the real mic button. When it is red, everyone in the voice channel sees you muted and/or deafened while your mic and sound still work. Choose what it fakes below.",
     author: "blxstncord",
-    version: "9.0.0",
+    version: "9.1.0",
     enabledByDefault: true,
     webpack: false,
 
@@ -33,6 +33,11 @@ let ctl = null; // lets the settings tab talk to the running plugin
         let lastInChannel = false;       // false when the last op-4 was "leave voice" (channel_id = nil)
         const real = { mute: false, deaf: false };
         let seenOp4 = 0, logged = 0;
+        // second, independent way in (v9.1.0): Discord's own voiceStateUpdate() on the gateway socket.
+        // Used automatically when it is found AND really gets called; then the WebSocket hook below only watches.
+        let protoActive = false, protoCalls = 0, protoInstalled = false;
+        let lastProto = null;            // { self, arg }: last voiceStateUpdate call with the REAL values
+        let frames = 0, binFrames = 0, hookErrs = 0;
 
         // ---------- minimal ETF reader (only what is needed to find offsets) ----------
         const u16 = (b, i) => (b[i] << 8) | b[i + 1];
@@ -142,19 +147,21 @@ let ctl = null; // lets the settings tab talk to the running plugin
         // ---------- the hook ----------
         api.patch(WebSocket.prototype, "send", orig => function (data, ...rest) {
             try {
+                frames++;
                 const b = toBytes(data);
                 if (b) {
+                    binFrames++;
                     const info = parseOp4(b);
                     if (info) {
                         lastWs = this;
                         lastRaw = b.slice();
                         lastInChannel = info.inChannel;
-                        real.mute = info.muteVal;
-                        real.deaf = info.deafVal;
                         seenOp4++;
-                        const fm = !stopped && isOn("mute") && !info.muteVal;
-                        const fd = !stopped && isOn("deaf") && !info.deafVal && !!info.deaf;
-                        if (logged < 8) { logged++; api.log("voice state packet #" + seenOp4 + ": self_mute=" + info.muteVal + " self_deaf=" + info.deafVal + " inChannel=" + info.inChannel + (fm ? " -> faking mute" : "") + (fd ? " -> faking deafen" : "")); }
+                        // when the voiceStateUpdate hook is working it already faked this packet and knows the real values
+                        if (!protoActive) { real.mute = info.muteVal; real.deaf = info.deafVal; }
+                        const fm = !stopped && !protoActive && isOn("mute") && !info.muteVal;
+                        const fd = !stopped && !protoActive && isOn("deaf") && !info.deafVal && !!info.deaf;
+                        if (logged < 8) { logged++; api.log("voice state packet #" + seenOp4 + ": self_mute=" + info.muteVal + " self_deaf=" + info.deafVal + " inChannel=" + info.inChannel + (protoActive ? " (already handled by the voiceStateUpdate hook)" : "") + (fm ? " -> faking mute" : "") + (fd ? " -> faking deafen" : "")); }
                         if (fm || fd) data = withValues(b, info, fm ? true : null, fd ? true : null).buffer;
                     }
                 } else if (typeof data === "string" && data.includes('"op":4') && data.includes("self_mute")) {
@@ -170,13 +177,58 @@ let ctl = null; // lets the settings tab talk to the running plugin
                         }
                     }
                 }
-            } catch (e) { if (logged < 12) { logged++; api.log("hook error: " + (e && e.message || e)); } }
+            } catch (e) { hookErrs++; if (logged < 12) { logged++; api.log("hook error: " + (e && e.message || e)); } }
             return orig.call(this, data, ...rest);
         });
 
-        // Send the last voice state again (with the REAL values; the hook turns them into the fake ones when on).
+        // ---------- fallback hook: Discord's own voiceStateUpdate({ guildId, channelId, selfMute, selfDeaf, ... }) ----------
+        function installProto() {
+            if (stopped || protoInstalled) return true;
+            try {
+                const C = api.webpack.findByPrototype(["voiceStateUpdate"], "voiceStateUpdate");
+                if (!C) return false;
+                api.patch(C.prototype, "voiceStateUpdate", orig => function (arg, ...rest) {
+                    try {
+                        if (arg && typeof arg === "object" && ("selfMute" in arg || "selfDeaf" in arg)) {
+                            protoActive = true; protoCalls++;
+                            lastProto = { self: this, arg: { ...arg } };   // the REAL values
+                            real.mute = !!arg.selfMute; real.deaf = !!arg.selfDeaf;
+                            const fm = !stopped && isOn("mute") && !arg.selfMute;
+                            const fd = !stopped && isOn("deaf") && !arg.selfDeaf;
+                            if (protoCalls <= 4) api.log("voiceStateUpdate #" + protoCalls + ": selfMute=" + !!arg.selfMute + " selfDeaf=" + !!arg.selfDeaf + " channel=" + (arg.channelId || "none") + (fm ? " -> faking mute" : "") + (fd ? " -> faking deafen" : ""));
+                            if (fm || fd) { arg = { ...arg }; if (fm) arg.selfMute = true; if (fd) arg.selfDeaf = true; }
+                        }
+                    } catch (e) { hookErrs++; if (logged < 12) { logged++; api.log("voiceStateUpdate hook error: " + (e && e.message || e)); } }
+                    return orig.call(this, arg, ...rest);
+                });
+                protoInstalled = true;
+                api.log("voiceStateUpdate hook installed (second way in)");
+                return true;
+            } catch (e) { api.log("voiceStateUpdate hook failed: " + (e && e.message || e)); return false; }
+        }
+        // Discord's modules may not be ready yet: try a few times in the background
+        let protoTries = 0;
+        const protoTimer = setInterval(() => {
+            if (stopped || installProto() || ++protoTries >= 10) clearInterval(protoTimer);
+        }, 4000);
+        installProto();
+        api.cleanup(() => clearInterval(protoTimer));
+
+        // one summary line so the log shows which way in works
+        const selfCheck = setTimeout(() => {
+            api.log("self-check: websocket sends=" + frames + " (binary " + binFrames + "), voice state packets=" + seenOp4 +
+                ", voiceStateUpdate hook " + (protoInstalled ? "installed, calls=" + protoCalls : "NOT found") + ", errors=" + hookErrs +
+                (seenOp4 === 0 && protoCalls === 0 ? " | no voice state seen yet: join a voice channel or click the real mute once" : ""));
+        }, 25000);
+        api.cleanup(() => clearTimeout(selfCheck));
+
+        // Send the last voice state again (with the REAL values; the hooks turn them into the fake ones when on).
         function pushState() {
             try {
+                if (protoActive && lastProto && lastProto.self && lastProto.arg && lastProto.arg.channelId) {
+                    lastProto.self.voiceStateUpdate({ ...lastProto.arg });
+                    return true;
+                }
                 if (!lastWs || lastWs.readyState !== 1 || !lastRaw || !lastInChannel) return false;
                 const info = parseOp4(lastRaw);
                 if (!info) return false;
@@ -196,7 +248,7 @@ let ctl = null; // lets the settings tab talk to the running plugin
             const ok = pushState();
             api.log("fake " + targets().join(" + ") + " " + (v ? "ON" : "off") + (ok ? ", voice state re-sent" :
                 (lastInChannel ? "" : " (not in a voice channel; it will apply when you join one)") +
-                (seenOp4 === 0 ? " (no voice state seen yet: click the real mute once, or rejoin the channel)" : "")));
+                (seenOp4 === 0 && protoCalls === 0 ? " (no voice state seen yet: click the real mute once, or rejoin the channel)" : "")));
         }
         const toggleFake = () => setFake(!fakeOn());
         ctl = { set: setFake, refresh: () => { paint(); pushState(); } };
