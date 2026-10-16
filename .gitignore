@@ -1,0 +1,24 @@
+# Logs
+*.log
+log.txt
+updater.log
+
+# Process & runtime files
+*.pid
+watcher.pid
+
+# Archives
+*.zip
+
+# Operating System files
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+.DS_Store
+
+# Node / Dependencies (if applicable)
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
