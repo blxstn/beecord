@@ -17,7 +17,7 @@ let refresh = null;   // lets the settings tab ask the running plugin to redraw
     id: "device-detector",
     name: "Device Detector",
     description: "Shows each user's device (PC / phone / browser / console) on their avatar, like Vencord's platform indicators. Reads Discord's PresenceStore, including users who appear offline when Discord reports a platform for them.",
-    author: "blxstncord",
+    author: "beecord",
     version: "2.2.0",
     enabledByDefault: true,
     webpack: true,

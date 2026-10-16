@@ -7,7 +7,7 @@ let refreshSpotify = null;
     id: "spotify",
     name: "Spotify Controls",
     description: "Now-playing card above your user bar: play/pause, next, previous, shuffle, repeat/loop, volume, progress and album cover.",
-    author: "blxstncord",
+    author: "beecord",
     version: "1.3.1",
     enabledByDefault: true,
     webpack: false,

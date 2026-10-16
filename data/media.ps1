@@ -1,4 +1,4 @@
-# blxstncord media helper (started by loader.js only while the "Spotify Controls" plugin is on).
+# beecord media helper (started by loader.js only while the "Spotify Controls" plugin is on).
 # Talks to the Windows media controls (the same ones behind the volume flyout) for the Spotify desktop app.
 #  - every second it prints one JSON line with the current song / state to stdout
 #  - commands arrive as small files "media-*.cmd" in -CmdDir (toggle | next | prev | seek:<milliseconds> | shuffle:on|off | repeat:none|track|list | volume:0-100 | mute:on|off)

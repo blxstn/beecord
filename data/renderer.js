@@ -1,7 +1,7 @@
-// blxstncord renderer (core): runs inside Discord's web page.
-// It provides the plugin system and the "blxstncord" tab in Discord Settings.
-// Plugins are separate files in %APPDATA%\blxstncord\plugins\*.js (detected by loader.js).
-// Console helpers (Ctrl+Shift+I): blxstncord.plugins(), blxstncord.status(), blxstncord.open(), blxstncord.rescan()
+// beecord renderer (core): runs inside Discord's web page.
+// It provides the plugin system and the "beecord" tab in Discord Settings.
+// Plugins are separate files in %APPDATA%\beecord\plugins\*.js (detected by loader.js).
+// Console helpers (Ctrl+Shift+I): beecord.plugins(), beecord.status(), beecord.open(), beecord.rescan()
 
 (() => {
     if (window.beecord || window.blxstncord) return;
@@ -178,7 +178,7 @@
     }
 
     // ---------- plugin registry ----------
-    // Plugin files call blxstncord.definePlugin({ id, name, description, author, version, enabledByDefault,
+    // Plugin files call beecord.definePlugin({ id, name, description, author, version, enabledByDefault,
     //   webpack (default true), start(api), stop(api), options(api) }).
     // start() returns false when the Discord module it needs was not found yet (it is retried automatically).
     // Everything registered through api.patch / api.addStyle / api.on / api.cleanup is undone on stop.
@@ -876,7 +876,7 @@
             h("div", { class: "fc-avatar", style: "--s:128px" }, h("img", { src: PROFILE.avatar, alt: PROFILE.name, draggable: "false" })),
             h("div", { class: "fc-eyebrow" }, "Made by"),
             h("h1", { class: "fc-pname" }, PROFILE.name),
-            h("p", { class: "fc-role" }, "Creator of blxstncord"),
+            h("p", { class: "fc-role" }, "Creator of beecord"),
             h("div", { class: "fc-socials" }, discord, instagram));
 
         const hero = h("section", { class: "fc-hero" }, particles, inner);
@@ -899,12 +899,12 @@
                 hero,
                 h("section", { class: "fc-project" },
                     h("div", { class: "fc-logo" }, svgIcon(ICON_PLUGINS)),
-                    h("div", null, h("b", null, "blxstncord"), h("span", null, "Plugins for the Discord desktop app."))),
+                    h("div", null, h("b", null, "beecord"), h("span", null, "Plugins for the Discord desktop app."))),
                 h("dl", { class: "fc-facts" },
                     fact("Plugins installed", String(list.length)),
                     fact("Plugins running", String(running)),
                     fact("Plugins folder", pluginsDir ? h("span", null, pluginsDir) : null, btn("Open", ICO.folder, () => log("cmd:open-folder"), true))),
-                h("p", { class: "fc-fine" }, "blxstncord is an independent project. It isn't affiliated with or endorsed by Discord.")));
+                h("p", { class: "fc-fine" }, "beecord is an independent project. It isn't affiliated with or endorsed by Discord.")));
     }
 
     function positionPanel() {
@@ -1089,7 +1089,7 @@
         const sec = secTpl.cloneNode(true);
         sec.removeAttribute("id");
         sec.setAttribute("data-blxstncord-sec", "section");
-        setLabel(headerOf(sec), "blxstncord");
+        setLabel(headerOf(sec), "beecord");
         const ul = listOf(sec);
         ul.replaceChildren();
 

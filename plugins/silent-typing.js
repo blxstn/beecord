@@ -4,7 +4,7 @@
     id: "typing",
     name: "Silent Typing",
     description: "Hides the \"is typing...\" indicator from other people while you type.",
-    author: "blxstncord",
+    author: "beecord",
     version: "3.0.0",
     enabledByDefault: true,
     webpack: false,

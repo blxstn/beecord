@@ -15,7 +15,7 @@ let blxMarkAll = null;   // lets the settings tab talk to the running plugin
     id: "mark-all-read",
     name: "Mark All Read",
     description: "Adds a button above the server list that marks every unread server channel and DM as read in one click.",
-    author: "blxstncord",
+    author: "beecord",
     version: "1.1.1",
     enabledByDefault: true,
     webpack: true,

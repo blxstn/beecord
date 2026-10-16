@@ -3,7 +3,7 @@
     id: "char-counter",
     name: "Character Counter",
     description: "Shows a live character counter while you type a message (turns red above the limit).",
-    author: "blxstncord",
+    author: "beecord",
     version: "1.0.1",
     webpack: false,
 

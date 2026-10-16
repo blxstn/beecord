@@ -25,7 +25,7 @@
     id: "friendship-notifier",
     name: "Friendship Notifier",
     description: "Logs + pop-up when someone removes/blocks you, sends you a friend request or withdraws it. Own tab in the Logs page.",
-    author: "blxstncord",
+    author: "beecord",
     version: "1.2.0",
     enabledByDefault: true,
     webpack: false,   // start immediately, so the READY packet (your friend list) is not missed; stores are searched later

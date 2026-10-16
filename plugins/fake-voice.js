@@ -1,6 +1,6 @@
 // Fake Mute / Deafen: ONE button to the LEFT of the real mic button.
 // Everyone in the voice channel sees you as muted / deafened, but your real mic and sound keep working.
-// No keyboard shortcuts: the button toggles it, and the settings (Discord Settings > blxstncord) choose what it fakes.
+// No keyboard shortcuts: the button toggles it, and the settings (Discord Settings > beecord) choose what it fakes.
 //
 // How: Discord's desktop client talks to its gateway over a WebSocket using binary ETF
 // (wss://gateway.discord.gg/?encoding=etf). The voice state is opcode 4:
@@ -14,7 +14,7 @@ let ctl = null; // lets the settings tab talk to the running plugin
     id: "voice",
     name: "Fake Mute / Deafen",
     description: "Adds one button (incognito icon) to the left of the real mic button. When it is red, everyone in the voice channel sees you muted and/or deafened while your mic and sound still work. Choose what it fakes below.",
-    author: "blxstncord",
+    author: "beecord",
     version: "9.1.0",
     enabledByDefault: true,
     webpack: false,

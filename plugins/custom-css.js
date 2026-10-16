@@ -5,7 +5,7 @@ let styleEl = null;
     id: "custom-css",
     name: "Custom CSS",
     description: "Write your own CSS to restyle Discord. Applies live while you type.",
-    author: "blxstncord",
+    author: "beecord",
     version: "1.0.0",
     webpack: false, // does not need Discord's internal modules
 

@@ -1,4 +1,4 @@
-// BeeBadge v1.0.0: the beebadge (the blxstncord bee) on your Discord profile, next to your other badges.
+// BeeBadge v1.0.0: the beebadge (the beecord bee) on your Discord profile, next to your other badges.
 //
 // The badge is a vector image (SVG), so it stays sharp at every size. It copies the look and size of a real Discord badge
 // in the same row, so it is exactly as big as the others. Turn it off in this plugin's settings (it disappears instantly).
@@ -13,7 +13,7 @@
     id: "beebadge",
     name: "BeeBadge",
     description: "Adds the beebadge (bee logo) to your Discord profile, next to your other badges, same size as Discord's own. Can be switched off in the settings.",
-    author: "blxstncord",
+    author: "beecord",
     version: "1.0.1",
     enabledByDefault: true,
     webpack: false,

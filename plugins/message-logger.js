@@ -1,5 +1,5 @@
 // Message Logger v1.6.0: deleted messages stay visible in the chat (red, marked "DELETED") and are listed in
-// Discord Settings > blxstncord > Logs, until YOU remove them (x on a message / "Clear all logs" button).
+// Discord Settings > beecord > Logs, until YOU remove them (x on a message / "Clear all logs" button).
 // Images, videos and files are downloaded when the message arrives and kept in IndexedDB, so they still
 // open after the message is deleted (Discord's CDN links stop working or expire after a delete).
 //
@@ -31,7 +31,7 @@ let blxMsgLogNote = ""; // extra info shown in the settings while it runs
     id: "message-logger",
     name: "Message Logger",
     description: "Keeps deleted messages and their media visible (red, DELETED) in DMs and servers, and lists them in the Logs tab until you clear them.",
-    author: "blxstncord",
+    author: "beecord",
     version: "1.6.0",
     enabledByDefault: true,
     webpack: true,
@@ -826,7 +826,7 @@ let blxMsgLogNote = ""; // extra info shown in the settings while it runs
             changed();
         }
 
-        // the "Logs" tab in Discord Settings > blxstncord reads from here
+        // the "Logs" tab in Discord Settings > beecord reads from here
         if (api.logs) api.logs.register({
             title: "Deleted messages",
             list: () => log.map(r => ({
@@ -891,7 +891,7 @@ let blxMsgLogNote = ""; // extra info shown in the settings while it runs
             row("Do not log my own deleted messages", toggle(api.settings.get("ignoreSelf", false), v => api.settings.set("ignoreSelf", v))),
             row("Clear the log of the open channel", chip("clear channel", () => blxMsgLog.clearHere())),
             row("Clear the whole log", chip("clear everything", () => blxMsgLog.clearAll())),
-            note("Deleted messages stay in the chat in red with a DELETED tag, and all of them are listed in the Logs tab (Settings > blxstncord > Logs). Only messages that arrived or were loaded while Discord was running can be kept; media is downloaded when the message arrives (max 25 MB per file, 400 MB total). The log holds the last 1000. Close and reopen this panel to refresh the status line.")
+            note("Deleted messages stay in the chat in red with a DELETED tag, and all of them are listed in the Logs tab (Settings > beecord > Logs). Only messages that arrived or were loaded while Discord was running can be kept; media is downloaded when the message arrives (max 25 MB per file, 400 MB total). The log holds the last 1000. Close and reopen this panel to refresh the status line.")
         ];
     }
 });

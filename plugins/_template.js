@@ -1,5 +1,5 @@
 // Plugin template. Files starting with "_" are ignored, so copy this to a new file
-// (for example my-plugin.js), change the id/name, then press "Rescan plugins" in the blxstncord tab.
+// (for example my-plugin.js), change the id/name, then press "Rescan plugins" in the beecord tab.
 //
 // api.settings.get(key, default) / api.settings.set(key, value)   saved per plugin
 // api.webpack.findByProps(needles, ...props) / findByPrototype(needles, name)   find Discord modules
