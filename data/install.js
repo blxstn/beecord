@@ -203,9 +203,11 @@ function install() {
 
     const loaderPath = path.join(dataDir, "loader.js");
 
-    // Kopiuj pluginy z folderu ../plugins
-    const srcPlugins = path.join(__dirname, "..", "plugins");
-    if (!fs.existsSync(srcPlugins)) throw new Error("Nie znaleziono folderu 'plugins' obok folderu data!");
+    // Kopiuj pluginy z folderu plugins (obok lub w podkatalogu)
+    const srcPlugins = fs.existsSync(path.join(__dirname, "plugins"))
+        ? path.join(__dirname, "plugins")
+        : path.join(__dirname, "..", "plugins");
+    if (!fs.existsSync(srcPlugins)) throw new Error("Nie znaleziono folderu 'plugins'!");
 
     for (const targetDir of targetDirs) {
         const dstPlugins = path.join(targetDir, "plugins");
