@@ -6,17 +6,19 @@
 // DATA SOURCE: Discord's own PresenceStore, the exact store Vencord reads. It is kept live through the
 // store's own change listener and, as a backup, a subscription to the Flux dispatcher's PRESENCE updates.
 //
-// HARD LIMIT (identical to Vencord and every other client mod): it can only show what Discord sends to
-// your client. Discord sends NO device for anyone who appears offline - including users set to Invisible.
-// So invisible users show nothing here, exactly as they show nothing in Vencord. This is a Discord
-// server-side rule, not a gap in the plugin.
+// LIMIT: it can only show what Discord sends to your client. Since v2.1.0 there is no filter on the user's
+// overall status (Vencord has none either): if the store lists a platform for a user who appears offline,
+// a grey icon is drawn for them (option "Also show the device of users who appear offline"). If Discord lists
+// no platform, nothing is drawn. Nothing is inferred from typing, voice or messages.
+
+let refresh = null;   // lets the settings tab ask the running plugin to redraw
 
 (window.beecord || window.blxstncord).definePlugin({
     id: "device-detector",
     name: "Device Detector",
-    description: "Shows each user's device (PC / phone / browser / console) on their avatar, like Vencord's platform indicators. Reads Discord's PresenceStore; invisible users report no device.",
+    description: "Shows each user's device (PC / phone / browser / console) on their avatar, like Vencord's platform indicators. Reads Discord's PresenceStore, including users who appear offline when Discord reports a platform for them.",
     author: "blxstncord",
-    version: "2.0.1",
+    version: "2.1.0",
     enabledByDefault: true,
     webpack: true,
 
@@ -26,8 +28,8 @@
         const STATUS_SEL = 'rect[mask*="status"], rect[mask*="Status"]';
         const ORDER = ["embedded", "mobile", "desktop", "web"];        // which icon wins when on several devices
         const LABEL = { desktop: "PC", mobile: "Phone", web: "Browser", embedded: "Console" };
-        const STATUS_COLOR = { online: "#23a559", idle: "#f0b232", dnd: "#f23f42", streaming: "#593695" };
-        const STATUS_NAME = { online: "Online", idle: "Idle", dnd: "Do Not Disturb", streaming: "Streaming" };
+        const STATUS_COLOR = { online: "#23a559", idle: "#f0b232", dnd: "#f23f42", streaming: "#593695", offline: "#80848e" };
+        const STATUS_NAME = { online: "Online", idle: "Idle", dnd: "Do Not Disturb", streaming: "Streaming", offline: "Shows offline, but a session is reported" };
         const ICONS = {   // Material icons, 24x24
             desktop: "M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7v2H8v2h8v-2h-2v-2h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H3V4h18v12z",
             mobile: "M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z",
@@ -59,16 +61,22 @@
         }
 
         // The device(s) + status Discord is reporting for this user. null = show nothing (leave Discord's dot).
+        // Like Vencord's PlatformIndicators (v2.1.0): the status filter is gone. What counts is whether Discord put
+        // a client status (platform list) for this user into the store. If it did, we show it, even when the user's
+        // overall status reads "offline". If it did not, nothing is drawn: no guessing, no side channels.
+        const offlineHits = new Set();
         function deviceInfo(id) {
             if (!presence) return null;
             let status;
             try { status = presence.getStatus(id); } catch { }
-            if (!status || status === "offline" || status === "invisible") return null;   // Discord sends no device for these
+            const appearsOffline = !status || status === "offline" || status === "invisible";
+            if (appearsOffline && !getS("showOffline", true)) return null;
             let cs;
             try { cs = presence.getClientStatus ? presence.getClientStatus(id) : null; } catch { }
             if (!cs) { try { const s = presence.getState && presence.getState(); cs = s && s.clientStatuses && s.clientStatuses[id]; } catch { } }
             const devices = ORDER.filter(d => cs && cs[d]);
-            if (!devices.length) return null;   // online but no platform reported -> leave Discord's own dot alone
+            if (!devices.length) return null;   // no platform reported -> leave Discord's own dot alone
+            if (appearsOffline) { offlineHits.add(id); return { status: "offline", devices, reported: cs[devices[0]] }; }
             return { status, devices };
         }
 
@@ -131,7 +139,7 @@
             const dev = inf.devices[0];
             const color = getS("color", true) ? (STATUS_COLOR[inf.status] || STATUS_COLOR.online) : STATUS_COLOR.online;
             const cx = x + w / 2, cy = y + h / 2, base = Math.max(w, h);
-            const sig = [dev, inf.devices.join("+"), color, cx, cy, base].join("|");
+            const sig = [dev, inf.devices.join("+"), inf.status, inf.reported || "", color, cx, cy, base].join("|");
 
             let g = badgeOf(rect);
             if (g && g.getAttribute("data-sig") === sig) { rect.setAttribute("data-blx-hide", "1"); return; }
@@ -140,7 +148,8 @@
             g.replaceChildren();
 
             const title = document.createElementNS(NS, "title");
-            title.textContent = inf.devices.map(d => LABEL[d]).join(" + ") + " \u00b7 " + (STATUS_NAME[inf.status] || inf.status);
+            title.textContent = inf.devices.map(d => LABEL[d]).join(" + ") + " \u00b7 " + (STATUS_NAME[inf.status] || inf.status) +
+                (inf.status === "offline" && inf.reported ? " (" + inf.reported + ")" : "");
 
             const r = base * 0.82, s = r * 1.35;
             const bg = document.createElementNS(NS, "circle");
@@ -176,12 +185,15 @@
             timer = setTimeout(() => { timer = null; try { scan(); } catch (e) { api.log("scan error: " + (e && e.message || e)); } }, 120);
         }
 
+        refresh = schedule;
+        api.cleanup(() => { refresh = null; });
+
         const mo = new MutationObserver(schedule);
         mo.observe(document.documentElement, { childList: true, subtree: true });
 
         const tries = [0, 2000, 6000, 15000, 40000].map(ms => setTimeout(() => { findStore(); schedule(); }, ms));
         const report = () => api.log("self-check: PresenceStore " + (presence ? "found" : "NOT found") +
-            ", dispatcher subscriptions " + dispatchers.length + " | " +
+            ", dispatcher subscriptions " + dispatchers.length + ", users showing offline but with a reported device: " + offlineHits.size + " | " +
             (presence ? "" : "without the store nothing can be shown; "));
         const r1 = setTimeout(report, 8000), r2 = setTimeout(report, 30000);
 
@@ -195,17 +207,19 @@
 
         findStore();
         schedule();
-        api.log("Device Detector v2.0.0 started");
+        api.log("Device Detector v2.1.0 started");
     },
 
     options(api) {
         return [
             api.ui.row("Colour the icon by status (online / idle / DnD)",
                 api.ui.toggle(api.settings.get("color", true), v => api.settings.set("color", v))),
-            api.ui.note("Shows the device each user is online on - PC, phone, browser or console - read from Discord's " +
-                "PresenceStore, the same source Vencord's platform indicators use. It can only show what Discord sends: " +
-                "anyone who appears offline, including users set to Invisible, reports no device, so nothing is drawn for " +
-                "them. That is a Discord server-side rule and is the same in Vencord and every other client mod.")
+            api.ui.row("Also show the device of users who appear offline (grey icon)",
+                api.ui.toggle(api.settings.get("showOffline", true), v => { api.settings.set("showOffline", v); if (refresh) refresh(); })),
+            api.ui.note("Shows the device each user is on - PC, phone, browser or console - read from Discord's " +
+                "PresenceStore, the same source Vencord's platform indicators use. It can only show what Discord sends to " +
+                "your client: when a user who appears offline still has a platform listed there, a grey icon is drawn; " +
+                "when Discord lists no platform, nothing is drawn.")
         ];
     }
 });
