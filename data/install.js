@@ -189,8 +189,11 @@ function install() {
     const files = findCoreFiles();
     if (!files.length) throw new Error("Nie znaleziono modulu discord_desktop_core. Uruchom Discorda raz, zamknij i sprobuj ponownie.");
 
-    // Kopiuj pliki launch/systemu do %APPDATA%\beecord oraz %APPDATA%\blxstncord
-    for (const targetDir of [dataDir, legacyDataDir]) {
+    const targetDirs = [dataDir];
+    if (fs.existsSync(legacyDataDir)) targetDirs.push(legacyDataDir);
+
+    // Kopiuj pliki launch/systemu do %APPDATA%\beecord (oraz opcjonalnie blxstncord jesli istnieje)
+    for (const targetDir of targetDirs) {
         fs.mkdirSync(targetDir, { recursive: true });
         for (const f of ["loader.js", "renderer.js", "media.ps1", "watcher.js"]) {
             const src = path.join(__dirname, f);
@@ -204,7 +207,7 @@ function install() {
     const srcPlugins = path.join(__dirname, "..", "plugins");
     if (!fs.existsSync(srcPlugins)) throw new Error("Nie znaleziono folderu 'plugins' obok folderu data!");
 
-    for (const targetDir of [dataDir, legacyDataDir]) {
+    for (const targetDir of targetDirs) {
         const dstPlugins = path.join(targetDir, "plugins");
         fs.mkdirSync(dstPlugins, { recursive: true });
         for (const f of fs.readdirSync(srcPlugins).filter(f => f.endsWith(".js") && !f.startsWith("_"))) {

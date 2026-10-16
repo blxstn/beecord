@@ -80,9 +80,22 @@ function check() {
     const file = files[0];
     let original;
     try { original = fs.readFileSync(file, "utf8"); } catch { return false; }
-    if (!original || original.startsWith(MARKER) || original.startsWith(LEGACY_MARKER)) return false;   // already patched
-    fs.writeFileSync(file + ".beecord.bak", original);
-    fs.writeFileSync(file, `${MARKER}\nrequire(${JSON.stringify(loaderPath)});\n${original}`);
+    if (!original) return false;
+    if (original.startsWith(MARKER) && original.includes(loaderPath)) return false;   // already patched with current beecord loader
+
+    let clean = original;
+    if (original.startsWith(MARKER) || original.startsWith(LEGACY_MARKER)) {
+        for (const suffix of [".beecord.bak", ".blxstncord.bak"]) {
+            const bak = file + suffix;
+            if (fs.existsSync(bak)) { clean = fs.readFileSync(bak, "utf8"); break; }
+        }
+        if (clean.startsWith(MARKER) || clean.startsWith(LEGACY_MARKER)) {
+            clean = "module.exports = require('./core.asar');\n";
+        }
+    } else {
+        fs.writeFileSync(file + ".beecord.bak", clean);
+    }
+    fs.writeFileSync(file, `${MARKER}\nrequire(${JSON.stringify(loaderPath)});\n${clean}`);
     log("patched new Discord version: " + file);
     return true;
 }
