@@ -1,4 +1,10 @@
 # Runtime logs & temporary files
+data/log.txt
+data/updater.log
+data/counter.json
+data/install-id.txt
+data/watcher.pid
+data/version.json
 log.txt
 updater.log
 counter.json
