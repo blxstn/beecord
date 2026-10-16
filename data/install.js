@@ -115,19 +115,52 @@ function isDiscordRunning() {
     } catch { return false; }
 }
 
+const sleepSync = ms => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch { } };
+
+// Discord.exe of the newest app-* folder (used when Update.exe cannot start it)
+function discordExePaths() {
+    try {
+        return fs.readdirSync(discordDir).filter(d => /^app-/.test(d)).sort().reverse()
+            .map(d => path.join(discordDir, d, "Discord.exe")).filter(p => fs.existsSync(p));
+    } catch { return []; }
+}
+
+// Starts Discord and CHECKS that it is really running. Tries three ways, one after another.
+function launchDiscord() {
+    const update = path.join(discordDir, "Update.exe");
+    const ways = [
+        () => spawn(update, ["--processStart", "Discord.exe"], { detached: true, stdio: "ignore", windowsHide: true }),
+        () => spawn("cmd.exe", ["/c", "start", "", update, "--processStart", "Discord.exe"], { detached: true, stdio: "ignore", windowsHide: true }),
+        () => { const exe = discordExePaths()[0]; if (!exe) throw new Error("nie znaleziono Discord.exe"); return spawn(exe, [], { detached: true, stdio: "ignore" }); }
+    ];
+    for (let i = 0; i < ways.length; i++) {
+        try {
+            const child = ways[i]();
+            child.on("error", e => console.log("Start Discorda (metoda " + (i + 1) + ") zglosil blad: " + e.message));
+            child.unref();
+        } catch (e) {
+            console.log("Start Discorda (metoda " + (i + 1) + ") nie powiodl sie: " + e.message);
+            continue;
+        }
+        for (let w = 0; w < 12; w++) {
+            sleepSync(1000);
+            if (isDiscordRunning()) { console.log("Discord zostal uruchomiony ponownie."); return true; }
+        }
+        console.log("Discord sie nie uruchomil (metoda " + (i + 1) + "), probuje inaczej...");
+    }
+    return false;
+}
+
 function restartDiscord() {
     console.log("Restartowanie Discorda...");
     try {
-        execFileSync("taskkill", ["/f", "/im", "Discord.exe"], { windowsHide: true, stdio: "ignore" });
+        execFileSync("taskkill", ["/f", "/t", "/im", "Discord.exe"], { windowsHide: true, stdio: "ignore" });
     } catch { }
-    setTimeout(() => {
-        try {
-            spawn(path.join(discordDir, "Update.exe"), ["--processStart", "Discord.exe"], { detached: true, stdio: "ignore", windowsHide: true }).unref();
-            console.log("Discord zostal uruchomiony ponownie.");
-        } catch (e) {
-            console.log("Nie udalo sie automatycznie uruchomic Discorda: " + e.message);
-        }
-    }, 2000);
+    for (let w = 0; w < 20 && isDiscordRunning(); w++) sleepSync(500);   // wait until it is really gone
+    sleepSync(1500);
+    if (!launchDiscord()) {
+        console.log("Nie udalo sie uruchomic Discorda automatycznie. Uruchom go recznie (skrot Discord na pulpicie lub w menu Start).");
+    }
 }
 
 function uninstall() {
