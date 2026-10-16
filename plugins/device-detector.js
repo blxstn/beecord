@@ -18,7 +18,7 @@ let refresh = null;   // lets the settings tab ask the running plugin to redraw
     name: "Device Detector",
     description: "Shows each user's device (PC / phone / browser / console) on their avatar, like Vencord's platform indicators. Reads Discord's PresenceStore, including users who appear offline when Discord reports a platform for them.",
     author: "blxstncord",
-    version: "2.1.0",
+    version: "2.2.0",
     enabledByDefault: true,
     webpack: true,
 
@@ -42,16 +42,103 @@ let refresh = null;   // lets the settings tab ask the running plugin to redraw
         // ============================ data: Discord's PresenceStore ============================
         let presence = null;
 
+        const safe = (fn, d) => { try { return fn(); } catch { return d; } };
+        const isPresence = o => !!o && (typeof o === "object" || typeof o === "function") &&
+            typeof o.getStatus === "function" && typeof o.addChangeListener === "function" &&
+            (typeof o.isMobileOnline === "function" || safe(() => o.getName() === "PresenceStore", false) ||
+             safe(() => o.constructor.displayName === "PresenceStore", false));
+
+        // ---- react fallback begin ----
+        // Discord components read the store through hooks, so the store instance sits in the React tree (hook
+        // dependencies / props). This finds it there when searching Discord's webpack modules finds nothing.
+        function reactRoot() {
+            for (const el of [document.getElementById("app-mount"), document.body, document.documentElement]) {
+                if (!el) continue;
+                for (const k of Object.keys(el)) if (k.startsWith("__reactContainer$")) return el[k];
+            }
+            const el = document.querySelector("img[src*='/avatars/'], [class*='avatar'], [class*='member']");
+            let f = el ? fiberOf(el) : null;
+            while (f && f.return) f = f.return;
+            return f;
+        }
+        function findInReact(pred, maxMs) {
+            const root = reactRoot();
+            if (!root) return null;
+            const t0 = Date.now();
+            const seen = new WeakSet();
+            const test = v => {
+                if (!v || (typeof v !== "object" && typeof v !== "function") || seen.has(v)) return false;
+                seen.add(v);
+                return safe(() => pred(v), false);
+            };
+            const inspect = v => {   // a store, or an array of stores (hook deps), possibly nested once
+                if (test(v)) return v;
+                if (Array.isArray(v)) for (const x of v) {
+                    if (test(x)) return x;
+                    if (Array.isArray(x)) for (const y of x) if (test(y)) return y;
+                }
+                return null;
+            };
+            const stack = [root];
+            let n = 0, r = null;
+            while (stack.length) {
+                const f = stack.pop();
+                if ((++n & 255) === 0 && Date.now() - t0 > maxMs) break;
+                const p = f.memoizedProps;
+                if (p && typeof p === "object") { for (const k in p) { if ((r = inspect(p[k]))) return r; } }
+                let h = f.memoizedState, hops = 0;
+                while (h && typeof h === "object" && hops++ < 80) {
+                    const s = h.memoizedState;
+                    if ((r = inspect(s))) return r;
+                    if (s && typeof s === "object") {
+                        if (s.deps && (r = inspect(s.deps))) return r;
+                        if (s.current && (r = inspect(s.current))) return r;
+                    }
+                    h = h.next;
+                }
+                const sn = f.stateNode;
+                if (sn && typeof sn === "object" && !sn.nodeType && (r = inspect(sn))) return r;
+                if (f.sibling) stack.push(f.sibling);
+                if (f.child) stack.push(f.child);
+            }
+            return null;
+        }
+        // ---- react fallback end ----
+
+        let viaReact = false, diagDone = 0;
+        // when nothing is found: say what IS visible, so the log shows why
+        function diagStores() {
+            try {
+                const st = api.webpack.stats();
+                const names = (api.webpack.findAll(o => safe(() => typeof o.getName === "function" && /Store$/.test(String(o.getName())), false), 400, 2) || [])
+                    .map(o => safe(() => String(o.getName()), "?"));
+                const withStatus = (api.webpack.findAll(o => safe(() => typeof o.getStatus === "function", false), 4, 2) || [])
+                    .map(o => safe(() => (o.constructor && o.constructor.name || "?") + "{" + Object.getOwnPropertyNames(Object.getPrototypeOf(o)).slice(0, 14).join(",") + "}", "?"));
+                api.log("diag: modules " + st.defined + " defined / " + st.loaded + " loaded; flux stores visible in modules: " + names.length +
+                    (names.length ? " (" + [...new Set(names)].slice(0, 25).join(", ") + ")" : "") +
+                    "; objects with getStatus(): " + JSON.stringify(withStatus) +
+                    "; react root " + (reactRoot() ? "found" : "NOT found"));
+            } catch (e) { api.log("diag error: " + (e && e.message || e)); }
+        }
+
         function findStore() {
             if (presence || stopped) return;
             try {
                 presence = api.webpack.find(o => o && typeof o.getStatus === "function" && typeof o.isMobileOnline === "function", 1) ||
                     api.webpack.find(o => o && typeof o.getState === "function" && typeof o.getStatus === "function", 1) ||
                     (api.webpack.findByProps && api.webpack.findByProps(["isMobileOnline"], "getStatus", "isMobileOnline")) ||
-                    api.webpack.findBy("presence-store", ["isMobileOnline"], o => typeof o.getStatus === "function") || null;
+                    api.webpack.findBy("presence-store", ["isMobileOnline"], o => typeof o.getStatus === "function") ||
+                    api.webpack.find(isPresence, 2) || null;
             } catch (e) { api.log("PresenceStore search error: " + (e && e.message || e)); }
+            if (!presence) {
+                try {
+                    presence = findInReact(isPresence, 1500) || null;
+                    if (presence) viaReact = true;
+                } catch (e) { api.log("PresenceStore react search error: " + (e && e.message || e)); }
+            }
+            if (!presence && diagDone < 2) { diagDone++; diagStores(); }
             if (presence) {
-                api.log("PresenceStore: found");
+                api.log("PresenceStore: found" + (viaReact ? " (via the React tree)" : ""));
                 try {
                     presence.addChangeListener(schedule);
                     api.cleanup(() => { try { presence.removeChangeListener(schedule); } catch { } });
@@ -191,8 +278,8 @@ let refresh = null;   // lets the settings tab ask the running plugin to redraw
         const mo = new MutationObserver(schedule);
         mo.observe(document.documentElement, { childList: true, subtree: true });
 
-        const tries = [0, 2000, 6000, 15000, 40000].map(ms => setTimeout(() => { findStore(); schedule(); }, ms));
-        const report = () => api.log("self-check: PresenceStore " + (presence ? "found" : "NOT found") +
+        const tries = [0, 2000, 6000, 15000, 40000, 90000].map(ms => setTimeout(() => { findStore(); schedule(); }, ms));
+        const report = () => api.log("self-check: PresenceStore " + (presence ? "found" + (viaReact ? " (React)" : "") : "NOT found") +
             ", dispatcher subscriptions " + dispatchers.length + ", users showing offline but with a reported device: " + offlineHits.size + " | " +
             (presence ? "" : "without the store nothing can be shown; "));
         const r1 = setTimeout(report, 8000), r2 = setTimeout(report, 30000);
@@ -207,7 +294,7 @@ let refresh = null;   // lets the settings tab ask the running plugin to redraw
 
         findStore();
         schedule();
-        api.log("Device Detector v2.1.0 started");
+        api.log("Device Detector v2.2.0 started");
     },
 
     options(api) {
