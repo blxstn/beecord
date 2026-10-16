@@ -12,7 +12,7 @@ const { execSync, execFileSync, spawn } = require("child_process");
 
 const REPO_URL = "https://github.com/blxstn/beecord.git";
 const MARKER = "/*BEECORD*/";
-const LEGACY_MARKER = "/*BLXSTNCORD*/";
+const discordDir = path.join(process.env.LOCALAPPDATA || "", "Discord");
 const beecordDir = path.join(process.env.APPDATA || "", "beecord");
 const dataDir = path.join(beecordDir, "data");
 const logsDir = path.join(beecordDir, "logs");
