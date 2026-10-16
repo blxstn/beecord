@@ -117,8 +117,9 @@ function checkDiscordPatch() {
     const file = files[0];
     let original;
     try { original = fs.readFileSync(file, "utf8"); } catch { return false; }
-    if (!original) return false;
-    if (original.startsWith(MARKER) && original.includes(loaderPath)) return false;
+    const normOrig = original.replace(/\\\\/g, "/").replace(/\\/g, "/");
+    const normLoader = loaderPath.replace(/\\/g, "/");
+    if (original.startsWith(MARKER) && normOrig.includes(normLoader)) return false;
 
     let clean = original;
     if (original.startsWith(MARKER) || original.startsWith(LEGACY_MARKER)) {
