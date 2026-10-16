@@ -15,11 +15,13 @@ const MARKER = "/*BEECORD*/";
 const LEGACY_MARKER = "/*BLXSTNCORD*/";
 const beecordDir = path.join(process.env.APPDATA || "", "beecord");
 const dataDir = path.join(beecordDir, "data");
+const logsDir = path.join(beecordDir, "logs");
 const pluginsDir = path.join(beecordDir, "plugins");
 const loaderPath = path.join(dataDir, "loader.js");
-const pidFile = path.join(dataDir, "watcher.pid");
-const logFile = path.join(dataDir, "updater.log");
-const versionFile = path.join(dataDir, "version.json");
+const pidFile = path.join(logsDir, "watcher.pid");
+const logFile = path.join(logsDir, "updater.log");
+const versionFile = path.join(logsDir, "version.json");
+try { fs.mkdirSync(logsDir, { recursive: true }); } catch { }
 
 const DISCORD_CHECK_INTERVAL = 10000;
 const GITHUB_CHECK_INTERVAL = 20000;

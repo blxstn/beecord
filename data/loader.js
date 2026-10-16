@@ -8,10 +8,13 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const logFile = path.join(__dirname, "log.txt");
-const pluginsDir = fs.existsSync(path.join(__dirname, "plugins"))
-    ? path.join(__dirname, "plugins")
-    : path.join(__dirname, "..", "plugins");
+const beecordDir = path.join(__dirname, "..");
+const logsDir = path.join(beecordDir, "logs");
+try { fs.mkdirSync(logsDir, { recursive: true }); } catch { }
+const logFile = fs.existsSync(logsDir) ? path.join(logsDir, "log.txt") : path.join(__dirname, "log.txt");
+const pluginsDir = fs.existsSync(path.join(beecordDir, "plugins"))
+    ? path.join(beecordDir, "plugins")
+    : path.join(__dirname, "plugins");
 const log = m => { try { fs.appendFileSync(logFile, new Date().toLocaleTimeString() + "  " + m + "\n"); } catch { } };
 try { fs.writeFileSync(logFile, ""); } catch { }
 try { fs.mkdirSync(pluginsDir, { recursive: true }); } catch { }

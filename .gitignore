@@ -1,16 +1,7 @@
 # Runtime logs & temporary files
-data/log.txt
-data/updater.log
-data/counter.json
-data/install-id.txt
-data/watcher.pid
-data/version.json
-log.txt
-updater.log
-counter.json
-install-id.txt
-watcher.pid
-version.json
+logs/
+*.log
+*.pid
 inbox/
 *.bak
 *.tmp

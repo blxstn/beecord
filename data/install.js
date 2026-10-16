@@ -252,8 +252,13 @@ function install() {
 }
 
 function showLog() {
-    const lf = fs.existsSync(path.join(dataDir, "log.txt")) ? path.join(dataDir, "log.txt") : path.join(legacyDataDir, "log.txt");
-    if (!fs.existsSync(lf)) { console.log("Brak pliku log.txt."); return; }
+    const candidatePaths = [
+        path.join(__dirname, "..", "logs", "log.txt"),
+        path.join(dataDir, "log.txt"),
+        path.join(legacyDataDir, "log.txt")
+    ];
+    let lf = candidatePaths.find(p => fs.existsSync(p));
+    if (!lf) { console.log("Brak pliku log.txt."); return; }
     console.log(fs.readFileSync(lf, "utf8"));
 }
 
