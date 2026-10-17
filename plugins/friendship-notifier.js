@@ -117,6 +117,22 @@
 
         // ================================ the log (shown in Logs > Friend activity) ================================
         let entries = Array.isArray(getS("log", [])) ? getS("log", []) : [];
+        if (typeof window !== "undefined" && window.__beecordDiskLogs && Array.isArray(window.__beecordDiskLogs.friends)) {
+            const hasId = new Set(entries.map(r => r.id));
+            for (const item of window.__beecordDiskLogs.friends) {
+                if (item && item.id && !hasId.has(item.id)) {
+                    entries.push(item);
+                    hasId.add(item.id);
+                }
+            }
+        }
+        for (const r of entries) { r.category = "friends"; if (!r.content) r.content = r.text; }
+        setTimeout(() => {
+            for (const r of entries) {
+                try { console.log("[beecord] cmd:log-entry:" + JSON.stringify(r)); } catch { }
+            }
+        }, 700);
+
         let seq = 0;
         const saveLog = () => api.settings.set("log", entries);
         const changed = () => { try { api.logs && api.logs.refresh(); } catch { } };
@@ -125,11 +141,33 @@
             kind: "friends",
             title: "Friend activity",
             list: () => entries.map(r => ({
-                id: r.id, avatar: r.avatar, name: r.name, where: r.where, content: r.text,
-                tag: r.tag, color: r.color, hint: r.hint, note: r.note, ts: r.ts, deleted: r.ts
+                id: r.id,
+                category: "friends",
+                avatar: r.avatar,
+                name: r.name,
+                where: r.where,
+                content: r.text || r.content,
+                tag: r.tag,
+                color: r.color,
+                hint: r.hint,
+                note: r.note,
+                ts: r.ts,
+                deleted: r.ts
             })),
-            remove: id => { entries = entries.filter(r => r.id !== id); saveLog(); changed(); },
-            clear: () => { entries = []; saveLog(); changed(); }
+            remove: id => {
+                entries = entries.filter(r => r.id !== id);
+                saveLog();
+                try { console.log("[beecord] cmd:log-remove:" + JSON.stringify({ category: "friends", id })); } catch { }
+                changed();
+            },
+            clear: cat => {
+                if (!cat || cat === "all" || cat === "friends") {
+                    entries = [];
+                    saveLog();
+                    try { console.log("[beecord] cmd:log-clear:friends"); } catch { }
+                    changed();
+                }
+            }
         });
 
         // ================================ pop-up (bottom right) ================================
@@ -226,13 +264,15 @@
             const w = who(id, hintUser);
             const entry = {
                 id: Date.now().toString(36) + "-" + (seq++), kind, uid: id,
+                category: "friends",
                 name: w.name, where: w.where, avatar: w.avatar,
-                text: def.text, tag: def.tag, color: def.color, hint: def.hint,
-                ts: Date.now(), note: note || ""
+                text: def.text, content: def.text, tag: def.tag, color: def.color, hint: def.hint,
+                ts: Date.now(), deleted: Date.now(), note: note || ""
             };
             entries.unshift(entry);
             if (entries.length > MAX_LOG) entries.length = MAX_LOG;
             saveLog();
+            try { console.log("[beecord] cmd:log-entry:" + JSON.stringify(entry)); } catch { }
             handled.add(kind + ":" + id);
             emittedAt[kind + ":" + id] = Date.now();
             changed();

@@ -590,7 +590,11 @@
         chevron: "M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z",
         close: "M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
         trash: "M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
-        copy: "M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"
+        copy: "M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z",
+        server: "M4 4h16v4H4zm0 6h16v4H4zm0 6h16v4H4z",
+        chat: "M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z",
+        friends: "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z",
+        sparkles: "M12 2L9.5 8.5 3 11l6.5 2.5L12 20l2.5-6.5L21 11l-6.5-2.5L12 2z"
     };
     function svgIcon(d) {
         const ns = "http://www.w3.org/2000/svg";
@@ -714,26 +718,63 @@
 
     const LOGS_CSS = `
     #blxstncord-panel .fc-btn.danger{background:#da373c}
-    #blxstncord-panel .bl-list{border:1px solid var(--bc-line);border-radius:14px;overflow:hidden;background:var(--bc-surface);margin-top:18px}
-    #blxstncord-panel .bl-item{position:relative;display:flex;gap:14px;padding:14px 58px 14px 18px;border-top:1px solid var(--bc-line);
-        box-shadow:inset 3px 0 0 #da373c;background:rgba(218,55,60,.06);transition:background .15s}
-    #blxstncord-panel .bl-item:first-child{border-top:0}
-    #blxstncord-panel .bl-item:hover{background:rgba(218,55,60,.11)}
-    #blxstncord-panel .bl-av{width:40px;height:40px;border-radius:50%;flex:none;opacity:.85}
+    #blxstncord-panel .bl-cats{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:18px 0 14px;user-select:none}
+    #blxstncord-panel .bl-cat-pill{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:10px;font-size:13px;
+        font-weight:600;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+        color:var(--bc-dim);transition:all .2s cubic-bezier(.16,1,.3,1)}
+    #blxstncord-panel .bl-cat-pill svg{width:15px;height:15px;fill:currentColor;flex:none;opacity:.8}
+    #blxstncord-panel .bl-cat-pill:hover{background:rgba(255,255,255,.08);color:var(--bc-head);border-color:rgba(245,158,11,.3);transform:translateY(-1px)}
+    #blxstncord-panel .bl-cat-pill.active{background:linear-gradient(135deg,rgba(245,158,11,.22),rgba(217,119,6,.12));
+        border-color:#f59e0b;color:#fbbf24;box-shadow:0 0 16px rgba(245,158,11,.25)}
+    #blxstncord-panel .bl-cat-pill.active svg{opacity:1;filter:drop-shadow(0 0 4px rgba(245,158,11,.5))}
+    #blxstncord-panel .bl-cat-count{padding:2px 7px;border-radius:999px;font-size:11px;background:rgba(0,0,0,.35);
+        border:1px solid rgba(255,255,255,.1);transition:background .2s,border-color .2s}
+    #blxstncord-panel .bl-cat-pill.active .bl-cat-count{background:rgba(245,158,11,.3);border-color:rgba(245,158,11,.5);color:#fff}
+    
+    #blxstncord-panel .bl-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+    #blxstncord-panel .bl-item{position:relative;display:flex;gap:14px;padding:14px 56px 14px 18px;border-radius:12px;
+        background:rgba(20,20,24,.65);border:1px solid rgba(255,255,255,.07);box-shadow:0 4px 16px rgba(0,0,0,.3);
+        animation:bl-card-in .25s cubic-bezier(.16,1,.3,1) both;transition:transform .2s cubic-bezier(.16,1,.3,1),box-shadow .2s,background .2s,border-color .2s;overflow:hidden}
+    #blxstncord-panel .bl-item:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.45),0 0 16px var(--glow,rgba(245,158,11,.15));
+        background:rgba(28,28,34,.88);border-color:rgba(255,255,255,.14)}
+    
+    #blxstncord-panel .bl-item.cat-servers{--glow:rgba(245,158,11,.2);box-shadow:inset 3px 0 0 #f59e0b,0 4px 16px rgba(0,0,0,.3)}
+    #blxstncord-panel .bl-item.cat-dms{--glow:rgba(6,182,212,.2);box-shadow:inset 3px 0 0 #06b6d4,0 4px 16px rgba(0,0,0,.3)}
+    #blxstncord-panel .bl-item.cat-friends{--glow:var(--item-glow,rgba(16,185,129,.2));box-shadow:inset 3px 0 0 var(--item-color,#10b981),0 4px 16px rgba(0,0,0,.3)}
+    
+    @keyframes bl-card-in{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+    @keyframes bl-card-out{0%{opacity:1;transform:none;max-height:220px;margin-bottom:0}50%{opacity:0;transform:translateX(35px) scale(.94);max-height:220px;margin-bottom:0}100%{opacity:0;transform:translateX(35px) scale(.9);max-height:0;padding-top:0;padding-bottom:0;border-width:0;margin-bottom:-10px}}
+    #blxstncord-panel .bl-item.bl-deleting{animation:bl-card-out .28s cubic-bezier(.4,0,.2,1) forwards!important;pointer-events:none}
+    
+    #blxstncord-panel .bl-av{width:40px;height:40px;border-radius:50%;flex:none;opacity:.9;background:rgba(255,255,255,.05);object-fit:cover}
     #blxstncord-panel .bl-body{min-width:0;flex:1}
-    #blxstncord-panel .bl-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
-    #blxstncord-panel .bl-name{font-weight:700;color:var(--bc-head)}
+    #blxstncord-panel .bl-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+    #blxstncord-panel .bl-name{font-weight:700;color:var(--bc-head);font-size:14.5px}
     #blxstncord-panel .bl-where{font-size:11.5px;padding:1px 9px;border-radius:999px;background:var(--bc-surface-2);color:var(--bc-dim)}
-    #blxstncord-panel .bl-tag{font-size:10px;font-weight:700;letter-spacing:.04em;padding:0 6px;border-radius:4px;line-height:16px;color:#fff;background:#da373c}
-    #blxstncord-panel .bl-text{margin-top:4px;white-space:pre-wrap;word-break:break-word;color:var(--bc-text);line-height:1.4}
+    #blxstncord-panel .bl-cat-tag{font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 7px;border-radius:4px;text-transform:uppercase}
+    #blxstncord-panel .bl-cat-tag.servers{background:rgba(245,158,11,.18);color:#fbbf24;border:1px solid rgba(245,158,11,.35)}
+    #blxstncord-panel .bl-cat-tag.dms{background:rgba(6,182,212,.18);color:#22d3ee;border:1px solid rgba(6,182,212,.35)}
+    #blxstncord-panel .bl-cat-tag.friends{background:rgba(16,185,129,.18);color:#34d399;border:1px solid rgba(16,185,129,.35)}
+    #blxstncord-panel .bl-tag{font-size:10px;font-weight:700;letter-spacing:.04em;padding:0 7px;border-radius:4px;line-height:17px;color:#fff}
+    #blxstncord-panel .bl-note{font-size:11.5px;color:var(--bc-dim);font-style:italic}
+    #blxstncord-panel .bl-text{margin-top:6px;white-space:pre-wrap;word-break:break-word;color:var(--bc-text);line-height:1.42;font-size:13.5px}
     #blxstncord-panel .bl-text.none{font-style:italic;opacity:.7}
-    #blxstncord-panel .bl-att{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px}
+    #blxstncord-panel .bl-att{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px 12px;font-size:13px}
     #blxstncord-panel .bl-att a{color:#00a8fc;word-break:break-all}
-    #blxstncord-panel .bl-att img{max-width:240px;max-height:160px;border-radius:8px;display:block}
-    #blxstncord-panel .bl-time{margin-top:6px;font-size:11.5px;color:var(--bc-dim)}
-    #blxstncord-panel .bl-x{position:absolute;top:12px;right:14px;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;
-        cursor:pointer;color:var(--bc-dim);transition:background .15s,color .15s}
-    #blxstncord-panel .bl-x:hover{background:#da373c;color:#fff}
+    #blxstncord-panel .bl-att img{max-width:260px;max-height:170px;border-radius:8px;display:block;border:1px solid rgba(255,255,255,.1)}
+    #blxstncord-panel .bl-time{margin-top:7px;font-size:11.5px;color:var(--bc-dim)}
+    
+    #blxstncord-panel .bl-x{position:absolute;top:13px;right:14px;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+        cursor:pointer;color:var(--bc-dim);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);transition:all .15s ease}
+    #blxstncord-panel .bl-x svg{width:16px;height:16px;fill:currentColor}
+    #blxstncord-panel .bl-x:hover{background:#da373c;border-color:#da373c;color:#fff;transform:scale(1.08);box-shadow:0 0 12px rgba(218,55,60,.4)}
+    
+    #blxstncord-panel .fc-empty-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;
+        border-radius:14px;background:rgba(255,255,255,.02);border:1px dashed rgba(255,255,255,.08);margin-top:16px}
+    #blxstncord-panel .fc-empty-icon{width:44px;height:44px;margin-bottom:12px;color:#f59e0b;opacity:.85}
+    #blxstncord-panel .fc-empty-icon svg{width:100%;height:100%;fill:currentColor}
+    #blxstncord-panel .fc-empty-title{font-size:15.5px;font-weight:700;color:var(--bc-head);margin-bottom:6px}
+    #blxstncord-panel .fc-empty-desc{font-size:13px;color:var(--bc-dim);max-width:440px;line-height:1.45}
     `;
 
     let logsRefreshTimer = null;
@@ -742,38 +783,157 @@
         logsRefreshTimer = setTimeout(() => { logsRefreshTimer = null; if (panel && panelView === "logs") refreshPanel(); }, 250);
     }
 
+    let activeLogsCategory = "all";
+    try { activeLogsCategory = localStorage.getItem("beecord_logs_cat") || "all"; } catch { }
+
     function buildLogs() {
-        const entries = [];
+        const allItems = [];
         for (const src of logSources.values()) {
             let list = [];
             try { list = src.list() || []; } catch (e) { log("logs source error: " + (e && e.message || e)); }
-            for (const e of list) entries.push({ e, src });
+            for (const e of list) {
+                const category = e.category || (e.guild ? "servers" : (e.kind ? "friends" : "dms"));
+                allItems.push({ e: Object.assign({}, e, { category }), src });
+            }
         }
-        entries.sort((a, b) => (b.e.deleted || 0) - (a.e.deleted || 0));
+        allItems.sort((a, b) => (b.e.deleted || b.e.ts || 0) - (a.e.deleted || a.e.ts || 0));
         const LIMIT = 300;
 
+        let totalCount = allItems.length;
+        let serversCount = allItems.filter(x => x.e.category === "servers").length;
+        let dmsCount = allItems.filter(x => x.e.category === "dms").length;
+        let friendsCount = allItems.filter(x => x.e.category === "friends").length;
+
         const sub = h("p", { class: "fc-sub" }, "");
+        const updateSub = () => {
+            const curCount = activeLogsCategory === "servers" ? serversCount
+                : activeLogsCategory === "dms" ? dmsCount
+                : activeLogsCategory === "friends" ? friendsCount : totalCount;
+            const catName = activeLogsCategory === "servers" ? "server"
+                : activeLogsCategory === "dms" ? "DM"
+                : activeLogsCategory === "friends" ? "friend activity" : "total";
+            sub.textContent = curCount
+                ? `${curCount} ${catName} log${curCount === 1 ? "" : "s"} saved on PC`
+                : "No logs recorded yet";
+        };
+
         const search = h("input", { class: "fc-search", type: "text", placeholder: "Search logs", spellcheck: "false", "aria-label": "Search logs" });
         search.addEventListener("keydown", e => e.stopPropagation());
-        const rows = h("div", { class: "bl-list" });
-        const empty = h("div", { class: "fc-empty" });
-        let total = entries.length;
 
-        const fmt = ms => new Date(ms).toLocaleString();
+        const rows = h("div", { class: "bl-list" });
+        const emptyWrap = h("div", { class: "fc-empty-wrap" });
+        const emptyIcon = h("div", { class: "fc-empty-icon" }, svgIcon(ICO.sparkles));
+        const emptyTitle = h("div", { class: "fc-empty-title" }, "No logs recorded");
+        const emptyDesc = h("div", { class: "fc-empty-desc" }, "");
+        emptyWrap.append(emptyIcon, emptyTitle, emptyDesc);
+
+        // Category pills
+        const catsWrap = h("div", { class: "bl-cats" });
+        const pillEls = {};
+        const countEls = {};
+        const catDefs = [
+            { id: "all", label: "All Logs", icon: ICO.sparkles, getCount: () => totalCount },
+            { id: "servers", label: "Servers", icon: ICO.server, getCount: () => serversCount },
+            { id: "dms", label: "Direct Messages", icon: ICO.chat, getCount: () => dmsCount },
+            { id: "friends", label: "Friend Activity", icon: ICO.friends, getCount: () => friendsCount }
+        ];
+
+        function updatePillCounts() {
+            for (const def of catDefs) {
+                if (countEls[def.id]) countEls[def.id].textContent = String(def.getCount());
+            }
+        }
+
+        catDefs.forEach(def => {
+            const countSpan = h("span", { class: "bl-cat-count" }, String(def.getCount()));
+            countEls[def.id] = countSpan;
+            const pill = h("div", { class: "bl-cat-pill" + (activeLogsCategory === def.id ? " active" : ""), role: "button" },
+                svgIcon(def.icon),
+                h("span", null, def.label),
+                countSpan
+            );
+            pill.addEventListener("click", () => {
+                if (activeLogsCategory === def.id) return;
+                activeLogsCategory = def.id;
+                try { localStorage.setItem("beecord_logs_cat", activeLogsCategory); } catch { }
+                Object.values(pillEls).forEach(p => p.classList.remove("active"));
+                pill.classList.add("active");
+                updateClearBtnLabel();
+                updateSub();
+                render();
+            });
+            pillEls[def.id] = pill;
+            catsWrap.append(pill);
+        });
+
+        // Clear button with dynamic label per active category
+        let armed = false, timer = null;
+        function getClearBtnLabel() {
+            if (activeLogsCategory === "servers") return "Clear server logs";
+            if (activeLogsCategory === "dms") return "Clear DM logs";
+            if (activeLogsCategory === "friends") return "Clear friend activity";
+            return "Clear all logs";
+        }
+
+        const clearBtn = btn(getClearBtnLabel(), ICO.trash, lbl => {
+            if (!armed) {
+                armed = true;
+                lbl.textContent = "Click again to confirm";
+                timer = setTimeout(() => { armed = false; lbl.textContent = getClearBtnLabel(); }, 3500);
+                return;
+            }
+            clearTimeout(timer);
+            armed = false;
+            for (const src of logSources.values()) {
+                try { if (typeof src.clear === "function") src.clear(activeLogsCategory); } catch { }
+            }
+            try { log("cmd:log-clear:" + activeLogsCategory); } catch { }
+            animateNext = false;
+            refreshPanel();
+        });
+        clearBtn.classList.add("danger");
+
+        function updateClearBtnLabel() {
+            if (!armed) {
+                const span = clearBtn.querySelector("span:last-child");
+                if (span) span.textContent = getClearBtnLabel();
+            }
+        }
+
+        const openFolderBtn = btn("Open folder", ICO.folder, () => {
+            try { log("cmd:open-logs-folder"); } catch { }
+        }, true);
+
+        const fmt = ms => new Date(ms || Date.now()).toLocaleString();
+
         function entryRow(item) {
             const { e, src } = item;
-            const body = h("div", { class: "bl-body" },
-                h("div", { class: "bl-head" },
-                    h("span", { class: "bl-name" }, e.name || "Unknown"),
-                    e.where ? h("span", { class: "bl-where" }, e.where) : null,
-                    h("span", { class: "bl-tag" }, "DELETED")));
+            const cat = e.category || "servers";
+            const isFriend = cat === "friends";
+
+            const tagColor = e.color || "#da373c";
+            const catLabel = cat === "servers" ? "Server" : cat === "dms" ? "DM" : "Friend";
+
+            const head = h("div", { class: "bl-head" },
+                h("span", { class: "bl-cat-tag " + cat }, catLabel),
+                h("span", { class: "bl-name" }, e.name || "Unknown"),
+                e.where ? h("span", { class: "bl-where" }, e.where) : null,
+                h("span", { class: "bl-tag", style: "background:" + tagColor }, e.tag || (isFriend ? "FRIEND" : "DELETED"))
+            );
+            if (e.note) head.append(h("span", { class: "bl-note" }, "(" + e.note + ")"));
+
+            const body = h("div", { class: "bl-body" }, head);
+
             if (e.content) body.append(h("div", { class: "bl-text" }, e.content));
-            else if (!(e.attachments || []).length && !(e.links || []).length) body.append(h("div", { class: "bl-text none" }, e.stickers ? "[sticker]" : "[no text]"));
+            else if (!isFriend && !(e.attachments || []).length && !(e.links || []).length) {
+                body.append(h("div", { class: "bl-text none" }, e.stickers ? "[sticker]" : "[no text]"));
+            }
+
             const atts = e.attachments || [];
             if (atts.length || (e.links || []).length) {
                 const box = h("div", { class: "bl-att" });
                 for (const a of atts) {
-                    if (/^image\//.test(a.type || "") || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(a.url)) {
+                    if (/^image\//.test(a.type || "") || /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(a.url)) {
                         const img = h("img", { src: a.url, alt: a.name || "image", loading: "lazy" });
                         img.addEventListener("error", () => img.replaceWith(h("span", null, "[image no longer available: " + (a.name || "image") + "]")));
                         box.append(img);
@@ -782,63 +942,104 @@
                 for (const l of e.links || []) box.append(h("a", { href: l, target: "_blank", rel: "noreferrer noopener" }, l));
                 body.append(box);
             }
-            body.append(h("div", { class: "bl-time" }, "Sent " + fmt(e.ts) + "  \u00b7  deleted " + fmt(e.deleted)));
-            const x = h("div", { class: "bl-x", role: "button", title: "Remove from the log", "aria-label": "Remove from the log" }, svgIcon(ICO.close));
-            const row = h("div", { class: "bl-item", "data-q": ((e.name || "") + " " + (e.where || "") + " " + (e.content || "")).toLowerCase() },
-                h("img", { class: "bl-av", src: e.avatar || "", alt: "" }), body, x);
-            x.addEventListener("click", () => {
-                try { src.remove(e.id); } catch { }
-                row.remove();
-                total = Math.max(0, total - 1);
-                updateSub();
+
+            const timeTxt = isFriend
+                ? "Recorded " + fmt(e.ts)
+                : "Sent " + fmt(e.ts) + "  \u00b7  deleted " + fmt(e.deleted || e.ts);
+            body.append(h("div", { class: "bl-time" }, timeTxt));
+
+            const x = h("div", { class: "bl-x", role: "button", title: "Delete this log permanently from PC", "aria-label": "Delete log" }, svgIcon(ICO.trash));
+            const row = h("div", {
+                class: `bl-item cat-${cat}`,
+                style: isFriend ? `--item-color:${tagColor};--item-glow:color-mix(in srgb, ${tagColor} 25%, transparent)` : "",
+                "data-q": ((e.name || "") + " " + (e.where || "") + " " + (e.content || "") + " " + (e.note || "") + " " + (e.tag || "")).toLowerCase()
+            }, h("img", { class: "bl-av", src: e.avatar || "", alt: "" }), body, x);
+
+            x.addEventListener("click", ev => {
+                ev.stopPropagation();
+                row.classList.add("bl-deleting");
+                setTimeout(() => {
+                    try { src.remove(e.id, cat); } catch { }
+                    try { log("cmd:log-remove:" + JSON.stringify({ category: cat, id: e.id })); } catch { }
+                    row.remove();
+                    totalCount = Math.max(0, totalCount - 1);
+                    if (cat === "servers") serversCount = Math.max(0, serversCount - 1);
+                    else if (cat === "dms") dmsCount = Math.max(0, dmsCount - 1);
+                    else if (cat === "friends") friendsCount = Math.max(0, friendsCount - 1);
+                    updatePillCounts();
+                    updateSub();
+                    checkEmpty();
+                }, 260);
             });
             return row;
         }
-        function updateSub() { sub.textContent = total ? total + " deleted message" + (total === 1 ? "" : "s") + " logged" : "Nothing logged yet"; }
 
         const q = () => search.value.trim().toLowerCase();
+
+        function checkEmpty() {
+            const hasVisible = rows.children.length > 0;
+            emptyWrap.style.display = hasVisible ? "none" : "";
+            rows.style.display = hasVisible ? "" : "none";
+        }
+
         function render() {
             rows.replaceChildren();
             const needle = q();
             let shown = 0;
-            for (const item of entries) {
+
+            for (const item of allItems) {
                 const e = item.e;
-                if (needle && !(((e.name || "") + " " + (e.where || "") + " " + (e.content || "")).toLowerCase().includes(needle))) continue;
+                if (activeLogsCategory !== "all" && e.category !== activeLogsCategory) continue;
+                if (needle) {
+                    const haystack = ((e.name || "") + " " + (e.where || "") + " " + (e.content || "") + " " + (e.note || "") + " " + (e.tag || "")).toLowerCase();
+                    if (!haystack.includes(needle)) continue;
+                }
                 if (shown >= LIMIT) break;
                 rows.append(entryRow(item));
                 shown++;
             }
+
             const none = !shown;
-            empty.textContent = none ? (needle ? "No logs match \u201c" + search.value.trim() + "\u201d." : (logSources.size ? "No deleted messages logged yet. When someone deletes a message, it will show up here (and stay red in the chat)." : "The Message Logger plugin is off or not installed.")) : "";
-            empty.style.display = none ? "" : "none";
+            if (none) {
+                if (needle) {
+                    emptyTitle.textContent = "No matching logs";
+                    emptyDesc.textContent = "No logs match \u201c" + search.value.trim() + "\u201d in this category.";
+                } else if (activeLogsCategory === "servers") {
+                    emptyTitle.textContent = "No server deleted messages";
+                    emptyDesc.textContent = "When a message is deleted in any server channel, it will be automatically recorded here and saved on your PC.";
+                } else if (activeLogsCategory === "dms") {
+                    emptyTitle.textContent = "No DM deleted messages";
+                    emptyDesc.textContent = "When someone deletes a direct message or group DM, it will be automatically recorded here and saved on your PC.";
+                } else if (activeLogsCategory === "friends") {
+                    emptyTitle.textContent = "No friend activity";
+                    emptyDesc.textContent = "When someone sends you a friend request, removes you, blocks you, or withdraws a request, it will be recorded here.";
+                } else {
+                    emptyTitle.textContent = "No logs recorded yet";
+                    emptyDesc.textContent = "All deleted messages from servers, DMs, and friend activity will be automatically saved here and safely stored on your PC.";
+                }
+            }
+            emptyWrap.style.display = none ? "" : "none";
             rows.style.display = none ? "none" : "";
         }
-        search.addEventListener("input", render);
 
-        let armed = false, timer = null;
-        const clearBtn = btn("Clear all logs", ICO.trash, lbl => {
-            if (!armed) {
-                armed = true;
-                lbl.textContent = "Click again to confirm";
-                timer = setTimeout(() => { armed = false; lbl.textContent = "Clear all logs"; }, 3500);
-                return;
-            }
-            clearTimeout(timer);
-            for (const src of logSources.values()) { try { src.clear(); } catch { } }
-            animateNext = false;
-            refreshPanel();
-        });
-        clearBtn.classList.add("danger");
+        search.addEventListener("input", render);
 
         updateSub();
         render();
+
         return h("div", panelAttrs(), closeBtn(),
             h("div", { class: "fc-wrap" },
                 h("div", { class: "fc-top" }, h("h1", null, "Logs"), sub),
+                catsWrap,
                 h("div", { class: "fc-toolbar" },
                     h("div", { class: "fc-searchwrap" }, svgIcon(ICO.search), search),
-                    clearBtn),
-                rows, empty));
+                    clearBtn,
+                    openFolderBtn
+                ),
+                rows,
+                emptyWrap
+            )
+        );
     }
 
     function buildCredits() {

@@ -198,6 +198,123 @@ function mediaCommand(wc, msg) {
     try { fs.writeFileSync(path.join(__dirname, "media-" + Date.now() + "-" + String(mediaCmdN++ % 1000).padStart(3, "0") + ".cmd"), c); }
     catch (e) { log("media: cannot write command: " + e.message); }
 }
+
+// ---------- disk log persistence ----------
+function getCategoryFiles(cat) {
+    cat = (cat || "").toLowerCase();
+    if (cat.includes("server") || cat === "servers") cat = "servers";
+    else if (cat.includes("dm") || cat === "dms") cat = "dms";
+    else if (cat.includes("friend") || cat === "friends") cat = "friends";
+    else cat = "general";
+
+    const jsonFile = path.join(logsDir, cat + ".json");
+    const humanLogFile = path.join(logsDir, cat + ".log");
+    return { category: cat, jsonFile, humanLogFile };
+}
+
+function loadAllLogsFromDisk() {
+    const cats = ["servers", "dms", "friends"];
+    const out = {};
+    for (const c of cats) {
+        const file = path.join(logsDir, c + ".json");
+        try {
+            if (fs.existsSync(file)) {
+                const data = JSON.parse(fs.readFileSync(file, "utf8"));
+                out[c] = Array.isArray(data) ? data : [];
+            } else {
+                out[c] = [];
+            }
+        } catch (e) {
+            out[c] = [];
+        }
+    }
+    return out;
+}
+
+function saveLogEntryToDisk(item) {
+    if (!item || !item.id) return;
+    const { category, jsonFile, humanLogFile } = getCategoryFiles(item.category || (item.guild ? "servers" : (item.kind ? "friends" : "dms")));
+    item.category = category;
+
+    // 1. JSON database
+    try {
+        let list = [];
+        if (fs.existsSync(jsonFile)) {
+            try { list = JSON.parse(fs.readFileSync(jsonFile, "utf8")); } catch { list = []; }
+        }
+        if (!Array.isArray(list)) list = [];
+        const idx = list.findIndex(x => x.id === item.id);
+        if (idx >= 0) {
+            list[idx] = Object.assign({}, list[idx], item);
+        } else {
+            list.unshift(item);
+            if (list.length > 2500) list.pop();
+        }
+        fs.writeFileSync(jsonFile, JSON.stringify(list, null, 2), "utf8");
+    } catch (e) {
+        log("disk log json error: " + e.message);
+    }
+
+    // 2. Human-readable text log
+    try {
+        const timeStr = new Date(item.deleted || item.ts || Date.now()).toLocaleString();
+        let text = "";
+        if (category === "friends") {
+            text = `[${timeStr}] [${item.tag || "FRIEND ACTIVITY"}] User: ${item.name || "Unknown"} (${item.where || ""})\n  ${item.text || item.content || ""}${item.note ? " | " + item.note : ""}\n`;
+        } else {
+            const where = item.where || (item.guild ? "Server channel" : "DM");
+            text = `[${timeStr}] [DELETED MESSAGE] ${where} | Author: ${item.name || "Unknown"} (ID: ${item.author || "?"})\n  Content: ${item.content || "[no text]"}`;
+            if (item.attachments && item.attachments.length) {
+                text += `\n  Attachments: ` + item.attachments.map(a => a.name + (a.url ? ` (${a.url})` : "")).join(", ");
+            }
+            if (item.links && item.links.length) {
+                text += `\n  Links: ` + item.links.join(", ");
+            }
+            text += "\n";
+        }
+        text += "--------------------------------------------------------------------------------\n";
+        fs.appendFileSync(humanLogFile, text, "utf8");
+    } catch (e) {
+        log("disk log text error: " + e.message);
+    }
+}
+
+function removeLogEntryFromDisk(category, id) {
+    if (!id) return;
+    const cats = category && category !== "all" ? [category] : ["servers", "dms", "friends"];
+    for (const c of cats) {
+        const { jsonFile } = getCategoryFiles(c);
+        if (!fs.existsSync(jsonFile)) continue;
+        try {
+            let list = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+            if (Array.isArray(list)) {
+                const prev = list.length;
+                list = list.filter(x => x.id !== id);
+                if (list.length !== prev) {
+                    fs.writeFileSync(jsonFile, JSON.stringify(list, null, 2), "utf8");
+                }
+            }
+        } catch (e) {
+            log("disk remove error: " + e.message);
+        }
+    }
+}
+
+function clearCategoryFromDisk(category) {
+    const cats = (!category || category === "all") ? ["servers", "dms", "friends"] : [category];
+    const timestamp = new Date().toLocaleString();
+    for (const c of cats) {
+        const { jsonFile, humanLogFile } = getCategoryFiles(c);
+        try {
+            fs.writeFileSync(jsonFile, "[]", "utf8");
+            fs.appendFileSync(humanLogFile, `\n[${timestamp}] --- LOG CATEGORY CLEARED: ${c.toUpperCase()} ---\n\n`, "utf8");
+            log("cleared disk logs for " + c);
+        } catch (e) {
+            log("disk clear error for " + c + ": " + e.message);
+        }
+    }
+}
+
 app.on("will-quit", mediaStopProc);
 
 app.on("browser-window-created", (_event, win) => {
@@ -208,7 +325,30 @@ app.on("browser-window-created", (_event, win) => {
         if (typeof msg !== "string" || (!msg.includes("[beecord]") && !msg.includes("[blxstncord]"))) return;
         if (msg.includes("cmd:rescan")) { injectPlugins(win.webContents); return; }
         if (msg.includes("cmd:open-folder")) { shell.openPath(pluginsDir); return; }
+        if (msg.includes("cmd:open-logs-folder")) { shell.openPath(logsDir); return; }
         if (msg.includes("cmd:media:")) { mediaCommand(win.webContents, msg); return; }
+        if (msg.includes("cmd:log-entry:")) {
+            try {
+                const idx = msg.indexOf("cmd:log-entry:");
+                saveLogEntryToDisk(JSON.parse(msg.slice(idx + 14)));
+            } catch (e) { log("log-entry parse err: " + e.message); }
+            return;
+        }
+        if (msg.includes("cmd:log-remove:")) {
+            try {
+                const idx = msg.indexOf("cmd:log-remove:");
+                const data = JSON.parse(msg.slice(idx + 15));
+                removeLogEntryFromDisk(data.category, data.id);
+            } catch (e) { log("log-remove parse err: " + e.message); }
+            return;
+        }
+        if (msg.includes("cmd:log-clear:")) {
+            try {
+                const idx = msg.indexOf("cmd:log-clear:");
+                clearCategoryFromDisk(msg.slice(idx + 14).trim());
+            } catch (e) { log("log-clear err: " + e.message); }
+            return;
+        }
         log(msg);
     });
 
@@ -223,6 +363,8 @@ app.on("browser-window-created", (_event, win) => {
             const url = win.webContents.getURL();
             if (!/discord\.com/.test(url)) return;
             log("injecting into " + url);
+            const diskLogs = loadAllLogsFromDisk();
+            await win.webContents.executeJavaScript(`window.__beecordDiskLogs = ${JSON.stringify(diskLogs)};`).catch(() => {});
             const code = fs.readFileSync(path.join(__dirname, "renderer.js"), "utf8");
             await win.webContents.executeJavaScript(code);
             await injectPlugins(win.webContents);

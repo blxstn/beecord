@@ -186,14 +186,62 @@ let blxMsgLogNote = ""; // extra info shown in the settings while it runs
         }
 
         // ---------- log storage ----------
+        const BLX_CHAT_DISMISSED_KEY = "blxstncord_chat_dismissed_v1";
         const storage = typeof window !== "undefined" && window.localStorage ? window.localStorage : (typeof localStorage !== "undefined" ? localStorage : null);
         const getStored = k => { try { return storage ? storage.getItem(k) : null; } catch { return null; } };
         const setStored = (k, v) => { try { if (storage) storage.setItem(k, v); } catch { } };
         let log = [];
         try { const v = JSON.parse(getStored(BLX_MSGLOG_KEY) || "[]"); if (Array.isArray(v)) log = v.filter(r => r && r.id && r.ch); } catch { }
+        // Merge from disk logs if available
+        if (typeof window !== "undefined" && window.__beecordDiskLogs) {
+            const diskItems = [
+                ...(Array.isArray(window.__beecordDiskLogs.servers) ? window.__beecordDiskLogs.servers : []),
+                ...(Array.isArray(window.__beecordDiskLogs.dms) ? window.__beecordDiskLogs.dms : [])
+            ];
+            const hasId = new Set(log.map(r => r.id));
+            for (const d of diskItems) {
+                if (d && d.id && !hasId.has(d.id)) {
+                    log.push(d);
+                    hasId.add(d.id);
+                }
+            }
+        }
         for (const r of log) { r.attachments = r.attachments || []; r.links = r.links || []; }
         const save = () => { try { setStored(BLX_MSGLOG_KEY, JSON.stringify(log)); } catch (e) { api.log("cannot save log: " + e.message); } };
         const logged = new Set(log.map(r => r.id));
+
+        const dismissedInChat = new Set();
+        try {
+            const dis = JSON.parse(getStored(BLX_CHAT_DISMISSED_KEY) || "[]");
+            if (Array.isArray(dis)) dis.forEach(id => dismissedInChat.add(String(id)));
+        } catch { }
+        const saveDismissed = () => { try { setStored(BLX_CHAT_DISMISSED_KEY, JSON.stringify([...dismissedInChat].slice(-2500))); } catch { } };
+
+        const syncToDisk = r => {
+            try {
+                const cat = r.guild ? "servers" : "dms";
+                console.log("[beecord] cmd:log-entry:" + JSON.stringify({
+                    category: cat,
+                    id: r.id,
+                    ch: r.ch,
+                    guild: r.guild,
+                    author: r.author,
+                    name: r.name,
+                    avatar: r.avatar,
+                    bot: r.bot,
+                    content: r.content,
+                    attachments: (r.attachments || []).map(a => ({ name: a.name, type: a.type, size: a.size, url: a.url })),
+                    links: r.links || [],
+                    stickers: r.stickers || 0,
+                    ts: r.ts,
+                    deleted: r.deleted || r.ts,
+                    where: r.where
+                }));
+            } catch { }
+        };
+        // Initial sync of existing logs to disk
+        setTimeout(() => { for (const r of log) syncToDisk(r); }, 600);
+
         const changed = () => { try { api.logs && api.logs.refresh(); } catch { } };
         for (const r of log) for (const a of r.attachments) if (a.key) loadObjUrl(a).then(u => { if (u) changed(); });
 
@@ -376,6 +424,7 @@ let blxMsgLogNote = ""; // extra info shown in the settings while it runs
             cache.delete(id);
             for (const a of r.attachments) if (a.key) { mediaKeep(a.key); loadObjUrl(a); }
             saveMedia(r, true, false);   // anything not saved yet: try right now, before the link dies
+            syncToDisk(r);
             stats.kept++;
             return true;
         }
@@ -706,8 +755,21 @@ let blxMsgLogNote = ""; // extra info shown in the settings while it runs
             return el;
         }
 
+        function dismissFromChat(id) {
+            id = String(id);
+            dismissedInChat.add(id);
+            saveDismissed();
+            const el = document.querySelector(`li.blx-del[data-id="${id}"]`);
+            if (el) {
+                el.style.transition = "all 0.22s cubic-bezier(0.4, 0, 0.2, 1)";
+                el.style.opacity = "0";
+                el.style.transform = "translateX(25px) scale(0.96)";
+                setTimeout(() => el.remove(), 220);
+            }
+        }
+
         function buildGhost(r) {
-            const li = h("li", { class: "blx-del", "data-id": r.id, "data-ch": r.ch });
+            const li = h("li", { class: "blx-del", "data-id": r.id, "data-ch": r.ch, "data-guild": r.guild || "" });
             const head = h("div", { class: "blx-head" },
                 h("span", { class: "blx-name" }, r.name),
                 r.bot ? h("span", { class: "blx-bot" }, "BOT") : null,
@@ -722,8 +784,8 @@ let blxMsgLogNote = ""; // extra info shown in the settings while it runs
                 body.append(att);
             }
             for (const l of r.links) body.append(h("div", null, h("a", { class: "blx-link", href: l, target: "_blank", rel: "noreferrer noopener" }, l)));
-            const x = h("div", { class: "blx-x", title: "Remove from the log", role: "button" }, "\u00d7");
-            x.addEventListener("click", e => { e.stopPropagation(); removeOne(r.id); });
+            const x = h("div", { class: "blx-x", title: "Dismiss from chat (remains in logs & on PC)", role: "button" }, "\u00d7");
+            x.addEventListener("click", e => { e.stopPropagation(); dismissFromChat(r.id); });
             li.append(h("img", { class: "blx-av", src: avatarUrl(r), alt: "" }), body, x);
             return li;
         }
@@ -759,6 +821,7 @@ let blxMsgLogNote = ""; // extra info shown in the settings while it runs
             if (ch) {
                 const oldest = natives.length ? natives[0].id : null;
                 for (const r of log) {
+                    if (dismissedInChat.has(r.id)) continue;
                     if (r.ch === ch && !nativeIds.has(r.id) && (oldest === null || cmp(r.id, oldest) > 0)) wanted.set(r.id, r);
                 }
             }
@@ -799,30 +862,73 @@ let blxMsgLogNote = ""; // extra info shown in the settings while it runs
 
         // ---------- log management ----------
         function removeOne(id) {
+            id = String(id);
             const rec = log.find(q => q.id === id);
-            if (rec) for (const a of rec.attachments) if (a.key) { mediaDel(a.key); const u = objUrls.get(a.key); if (u) { URL.revokeObjectURL(u); objUrls.delete(a.key); } }
+            if (rec) {
+                const cat = rec.guild ? "servers" : "dms";
+                for (const a of rec.attachments || []) if (a.key) { mediaDel(a.key); const u = objUrls.get(a.key); if (u) { URL.revokeObjectURL(u); objUrls.delete(a.key); } }
+                try { console.log("[beecord] cmd:log-remove:" + JSON.stringify({ category: cat, id })); } catch { }
+            }
             log = log.filter(q => q.id !== id);
             logged.delete(id);
+            dismissedInChat.delete(id);
             save();
+            saveDismissed();
             document.querySelectorAll('li.blx-del[data-id="' + id + '"]').forEach(el => el.remove());
             changed();
         }
         function dropAllMedia(list) {
-            for (const r of list) for (const a of r.attachments) if (a.key) { mediaDel(a.key); const u = objUrls.get(a.key); if (u) { URL.revokeObjectURL(u); objUrls.delete(a.key); } }
+            for (const r of list) for (const a of r.attachments || []) if (a.key) { mediaDel(a.key); const u = objUrls.get(a.key); if (u) { URL.revokeObjectURL(u); objUrls.delete(a.key); } }
+        }
+        function clearCategory(cat) {
+            if (!cat || cat === "all") {
+                clearAll();
+                return;
+            }
+            if (cat === "servers") {
+                const toDrop = log.filter(r => r.guild);
+                dropAllMedia(toDrop);
+                toDrop.forEach(r => { logged.delete(r.id); dismissedInChat.delete(r.id); });
+                log = log.filter(r => !r.guild);
+                save();
+                saveDismissed();
+                try { console.log("[beecord] cmd:log-clear:servers"); } catch { }
+                document.querySelectorAll("li.blx-del").forEach(el => {
+                    if (el.getAttribute("data-guild")) el.remove();
+                });
+                changed();
+            } else if (cat === "dms") {
+                const toDrop = log.filter(r => !r.guild);
+                dropAllMedia(toDrop);
+                toDrop.forEach(r => { logged.delete(r.id); dismissedInChat.delete(r.id); });
+                log = log.filter(r => r.guild);
+                save();
+                saveDismissed();
+                try { console.log("[beecord] cmd:log-clear:dms"); } catch { }
+                document.querySelectorAll("li.blx-del").forEach(el => {
+                    if (!el.getAttribute("data-guild")) el.remove();
+                });
+                changed();
+            }
         }
         function clearAll() {
             dropAllMedia(log);
-            log = []; logged.clear(); save();
+            log = []; logged.clear(); dismissedInChat.clear();
+            save();
+            saveDismissed();
+            try { console.log("[beecord] cmd:log-clear:all"); } catch { }
             document.querySelectorAll("li.blx-del").forEach(el => el.remove());
             changed();
         }
         function clearHere() {
             const m = /\/channels\/[^/]+\/(\d+)/.exec(location.pathname);
             if (!m) return;
-            dropAllMedia(log.filter(r => r.ch === m[1]));
-            for (const r of log) if (r.ch === m[1]) logged.delete(r.id);
-            log = log.filter(r => r.ch !== m[1]); save();
-            document.querySelectorAll("li.blx-del").forEach(el => el.remove());
+            // Dismiss current channel from chat view (keeps safely in logs & PC)
+            for (const r of log) if (r.ch === m[1]) dismissedInChat.add(r.id);
+            saveDismissed();
+            document.querySelectorAll("li.blx-del").forEach(el => {
+                if (el.getAttribute("data-ch") === m[1]) el.remove();
+            });
             changed();
         }
 
@@ -830,12 +936,21 @@ let blxMsgLogNote = ""; // extra info shown in the settings while it runs
         if (api.logs) api.logs.register({
             title: "Deleted messages",
             list: () => log.map(r => ({
-                id: r.id, avatar: avatarUrl(r), name: r.name, where: r.where || (r.guild ? "server" : "DM"), content: r.content,
-                attachments: r.attachments.map(a => ({ url: (a.key && objUrls.get(a.key)) || a.url, name: a.name, type: a.type })),
-                links: r.links, stickers: r.stickers, ts: r.ts, deleted: r.deleted || r.ts
+                id: r.id,
+                category: r.guild ? "servers" : "dms",
+                guild: r.guild,
+                avatar: avatarUrl(r),
+                name: r.name,
+                where: r.where || (r.guild ? "server" : "DM"),
+                content: r.content,
+                attachments: (r.attachments || []).map(a => ({ url: (a.key && objUrls.get(a.key)) || a.url, name: a.name, type: a.type })),
+                links: r.links || [],
+                stickers: r.stickers || 0,
+                ts: r.ts,
+                deleted: r.deleted || r.ts
             })),
             remove: removeOne,
-            clear: clearAll
+            clear: clearCategory
         });
 
         api.cleanup(() => {
