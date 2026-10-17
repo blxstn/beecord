@@ -6,8 +6,8 @@ cd /d "%~dp0"
 where node >nul 2>nul
 if %errorlevel% neq 0 (
     echo.
-    echo [BLAD] Node.js nie zostal znaleziony w systemie!
-    echo Zainstaluj Node.js ze strony https://nodejs.org i uruchom instalator ponownie.
+    echo [ERROR] Node.js was not found on your system!
+    echo Please install Node.js from https://nodejs.org and run the installer again.
     echo.
     pause
     exit /b 1
@@ -20,7 +20,7 @@ if not "%~1"=="" (
     node "%SCRIPT%" %*
     if errorlevel 1 (
         echo.
-        echo [BLAD] Wystapil blad podczas wykonywania operacji.
+        echo [ERROR] An error occurred during the operation.
     )
     pause
     exit /b %errorlevel%
@@ -32,14 +32,14 @@ echo ======================================================
 echo                  BEECORD INSTALLER
 echo ======================================================
 echo.
-echo   [1] Zainstaluj / Zaktualizuj Beecord (Wszystkie pliki)
-echo   [2] Odinstaluj Beecord
-echo   [3] Pokaz logi (log.txt)
-echo   [4] Wyjdz
+echo   [1] Install / Update Beecord (All files)
+echo   [2] Uninstall Beecord
+echo   [3] Show logs (log.txt)
+echo   [4] Exit
 echo.
 echo ======================================================
 set "CHOICE=1"
-set /p "CHOICE=Wybierz opcje (1-4) [domyslnie 1]: "
+set /p "CHOICE=Choose an option (1-4) [default 1]: "
 
 if "%CHOICE%"=="1" (
     echo.
@@ -54,7 +54,7 @@ if "%CHOICE%"=="1" (
     exit /b 0
 ) else (
     echo.
-    echo [INFO] Wybrano domyslna opcje (Instalacja)...
+    echo [INFO] Selected default option (Install)...
     node "%SCRIPT%" install
 )
 

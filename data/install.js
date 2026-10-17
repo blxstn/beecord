@@ -1,6 +1,6 @@
-// beecord installer (Windows). Usage:
+// Beecord installer (Windows). Usage:
 //   node install.js            -> install
-//   node install.js uninstall  -> remove (also stops the auto-updater)
+//   node install.js uninstall  -> remove (also stops background auto-updater)
 //   node install.js log        -> show log.txt
 
 const fs = require("fs");
@@ -58,7 +58,7 @@ function installWatcher() {
     stopWatcher();
     const watcher = path.join(targetDataDir, "watcher.js");
     if (!fs.existsSync(watcher)) {
-        console.log("  [WARN] watcher.js nie istnieje w " + targetDataDir);
+        console.log("  [WARN] watcher.js does not exist in " + targetDataDir);
         return;
     }
     const cmd = `"${process.execPath}" "${watcher}"`;
@@ -66,7 +66,7 @@ function installWatcher() {
     try { fs.rmSync(legacyStartupFile, { force: true }); } catch { }
     fs.writeFileSync(startupFile, `CreateObject("WScript.Shell").Run "${cmd.replace(/"/g, '""')}", 0, False\r\n`);
     spawn(process.execPath, [watcher], { detached: true, stdio: "ignore", windowsHide: true }).unref();
-    console.log("Auto-updater aktywny: beecord aktualizuje sie automatycznie po update Discorda.");
+    console.log("Auto-updater active: Beecord updates automatically when Discord updates.");
 }
 
 function removeWatcher() {
@@ -82,7 +82,7 @@ function safeCopyFile(src, dst) {
         fs.copyFileSync(src, dst);
         return true;
     } catch (e) {
-        console.error(`  [WARN] Nie udalo sie skopiowac ${path.basename(src)}: ${e.message}`);
+        console.error(`  [WARN] Could not copy ${path.basename(src)}: ${e.message}`);
         return false;
     }
 }
@@ -116,7 +116,7 @@ function cmpVersion(a, b) {
 }
 
 function findCoreFiles() {
-    if (!fs.existsSync(discordDir)) throw new Error(`Nie znaleziono folderu Discorda w ${discordDir}`);
+    if (!fs.existsSync(discordDir)) throw new Error(`Discord directory not found at ${discordDir}`);
     const apps = fs.readdirSync(discordDir).filter(d => /^app-\d/.test(d)).sort((a, b) => cmpVersion(b, a));
     const found = [];
     for (const app of apps) {
@@ -138,7 +138,7 @@ function cleanLegacy() {
                 if (!fs.existsSync(bak)) continue;
                 fs.copyFileSync(bak, file);
                 try { fs.unlinkSync(bak); } catch { }
-                console.log("Przywrocono oryginalny plik z kopii zapasowej: " + bak);
+                console.log("Restored original file from backup: " + bak);
             }
         }
     } catch { }
@@ -157,7 +157,7 @@ function cleanVencord() {
                 if (!/vencord|patcher\.js/i.test(fs.readFileSync(idx, "utf8"))) continue;
                 fs.rmSync(appDir, { recursive: true, force: true });
                 if (!fs.existsSync(path.join(res, "app.asar"))) fs.renameSync(asarBak, path.join(res, "app.asar"));
-                console.log(`Usunieto stara modyfikacje Vencord z ${a}`);
+                console.log(`Removed legacy Vencord mod from ${a}`);
             } catch (e) { }
         }
     } catch { }
@@ -183,41 +183,41 @@ function launchDiscord() {
     const ways = [
         () => spawn(update, ["--processStart", "Discord.exe"], { detached: true, stdio: "ignore", windowsHide: true }),
         () => spawn("cmd.exe", ["/c", "start", "", update, "--processStart", "Discord.exe"], { detached: true, stdio: "ignore", windowsHide: true }),
-        () => { const exe = discordExePaths()[0]; if (!exe) throw new Error("nie znaleziono Discord.exe"); return spawn(exe, [], { detached: true, stdio: "ignore" }); }
+        () => { const exe = discordExePaths()[0]; if (!exe) throw new Error("Discord.exe not found"); return spawn(exe, [], { detached: true, stdio: "ignore" }); }
     ];
     for (let i = 0; i < ways.length; i++) {
         try {
             const child = ways[i]();
-            child.on("error", e => console.log("Start Discorda (metoda " + (i + 1) + ") zglosil blad: " + e.message));
+            child.on("error", e => console.log("Discord launch (method " + (i + 1) + ") reported error: " + e.message));
             child.unref();
         } catch (e) {
-            console.log("Start Discorda (metoda " + (i + 1) + ") nie powiodl sie: " + e.message);
+            console.log("Discord launch (method " + (i + 1) + ") failed: " + e.message);
             continue;
         }
         for (let w = 0; w < 12; w++) {
             sleepSync(1000);
-            if (isDiscordRunning()) { console.log("Discord zostal uruchomiony ponownie."); return true; }
+            if (isDiscordRunning()) { console.log("Discord restarted successfully."); return true; }
         }
-        console.log("Discord sie nie uruchomil (metoda " + (i + 1) + "), probuje inaczej...");
+        console.log("Discord has not started yet (method " + (i + 1) + "), trying alternative...");
     }
     return false;
 }
 
 function restartDiscord() {
-    console.log("Restartowanie Discorda...");
+    console.log("Restarting Discord...");
     try {
         execFileSync("taskkill", ["/f", "/t", "/im", "Discord.exe"], { windowsHide: true, stdio: "ignore" });
     } catch { }
     for (let w = 0; w < 20 && isDiscordRunning(); w++) sleepSync(500);
     sleepSync(1500);
     if (!launchDiscord()) {
-        console.log("Nie udalo sie uruchomic Discorda automatycznie. Uruchom go recznie (skrot Discord na pulpicie lub w menu Start).");
+        console.log("Could not start Discord automatically. Please launch it manually from the desktop or Start Menu shortcut.");
     }
 }
 
 function uninstall() {
     console.log("======================================================");
-    console.log("             ODINSTALOWYWANIE BEECORD");
+    console.log("               UNINSTALLING BEECORD");
     console.log("======================================================");
     removeWatcher();
     cleanLegacy();
@@ -231,55 +231,55 @@ function uninstall() {
             n++;
         }
     }
-    console.log(n ? `Przywrocono ${n} plik(ow) Discorda. Beecord zostal odinstalowany.` : "Brak aktywnych modyfikacji do usuniecia w Discordzie.");
+    console.log(n ? `Restored ${n} Discord file(s). Beecord has been uninstalled.` : "No active modifications found to remove.");
     if (isDiscordRunning()) restartDiscord();
 }
 
 function install() {
     console.log("======================================================");
-    console.log("              INSTALACJA BEECORD");
+    console.log("                BEECORD INSTALLATION");
     console.log("======================================================");
 
     if (fs.existsSync(discordDir)) cleanVencord();
     cleanLegacy();
     const files = findCoreFiles();
-    if (!files.length) throw new Error("Nie znaleziono modulu discord_desktop_core. Uruchom Discorda raz, zamknij i sprobuj ponownie.");
+    if (!files.length) throw new Error("Could not find discord_desktop_core module. Launch Discord once, close it, and try again.");
 
-    // Tworzenie zorganizowanej struktury 4 podfolderow
+    // Create organized folder structure
     for (const dir of [targetRootDir, targetDataDir, targetPluginsDir, targetAssetsDir, targetLogsDir]) {
         fs.mkdirSync(dir, { recursive: true });
     }
 
-    // 1. Kopiuj wszystkie pliki systemowe z folderu data
-    console.log("[1/5] Instalowanie plikow systemowych (data/)...");
+    // 1. Copy core system files
+    console.log("[1/5] Installing core system files (data/)...");
     if (fs.existsSync(sourceDataDir)) {
         copyDirRecursive(sourceDataDir, targetDataDir);
     }
     const dataFiles = fs.existsSync(targetDataDir) ? fs.readdirSync(targetDataDir) : [];
-    console.log(`      Zainstalowano ${dataFiles.length} plik(ow) systemowych.`);
+    console.log(`      Installed ${dataFiles.length} system file(s).`);
 
-    // 2. Kopiuj wszystkie assety (ikony, zdjecia, grafiki)
-    console.log("[2/5] Instalowanie zasobow i ikon (assets/)...");
+    // 2. Copy assets (icons, wallpapers, logos)
+    console.log("[2/5] Installing assets and icons (assets/)...");
     if (fs.existsSync(sourceAssetsDir)) {
         copyDirRecursive(sourceAssetsDir, targetAssetsDir);
     }
     const assetFiles = fs.existsSync(targetAssetsDir) ? fs.readdirSync(targetAssetsDir) : [];
-    console.log(`      Zainstalowano ${assetFiles.length} plik(ow) zasobow.`);
+    console.log(`      Installed ${assetFiles.length} asset(s).`);
 
-    // 3. Kopiuj dynamicznie WSZYSTKIE wtyczki (aktualne i nowo dodane)
-    console.log("[3/5] Instalowanie wtyczek (plugins/)...");
+    // 3. Dynamically copy all plugins
+    console.log("[3/5] Installing plugins (plugins/)...");
     if (fs.existsSync(sourcePluginsDir)) {
         copyDirRecursive(sourcePluginsDir, targetPluginsDir);
     }
     const installedPlugins = fs.existsSync(targetPluginsDir)
         ? fs.readdirSync(targetPluginsDir).filter(f => /\.js$/i.test(f) && !f.startsWith("_") && !f.startsWith("."))
         : [];
-    console.log(`      Wykryto i zainstalowano wtyczki (${installedPlugins.length}):`);
+    console.log(`      Detected and installed plugins (${installedPlugins.length}):`);
     installedPlugins.forEach(p => console.log(`       -> ${p}`));
 
-    // 4. Kopiowanie wszelkich innych podfolderow uzytkownika i plikow glownych
+    // 4. Copy root files if source != target
     if (path.resolve(sourceRootDir) !== path.resolve(targetRootDir)) {
-        console.log("[4/5] Kopiowanie plikow glownych...");
+        console.log("[4/5] Synchronizing root files...");
         const ignored = new Set([".git", "logs", "inbox", "node_modules", "data", "plugins", "assets"]);
         for (const entry of fs.readdirSync(sourceRootDir, { withFileTypes: true })) {
             if (ignored.has(entry.name)) continue;
@@ -292,15 +292,15 @@ function install() {
             }
         }
     } else {
-        console.log("[4/5] Synchronizacja plikow glownych...");
+        console.log("[4/5] Synchronizing root files...");
     }
 
-    // Upewnij sie, ze w katalogu glownym istnieja pliki proxy wskazujace na data/
+    // Ensure root proxy files exist
     fs.writeFileSync(path.join(targetRootDir, "loader.js"), "module.exports = require('./data/loader.js');\r\n");
     fs.writeFileSync(path.join(targetRootDir, "watcher.js"), "require(\"./data/watcher.js\");\r\n");
 
-    // 5. Spatchuj najnowsza wersje Discorda wskazujac na targetDataDir/loader.js
-    console.log("[5/5] Patchowanie Discorda...");
+    // 5. Patch Discord core
+    console.log("[5/5] Patching Discord core...");
     const loaderPath = path.join(targetDataDir, "loader.js");
     const file = files[0];
     const bak = file + ".beecord.bak";
@@ -319,19 +319,19 @@ function install() {
     }
 
     fs.writeFileSync(file, `${MARKER}\nrequire(${JSON.stringify(loaderPath)});\n${original}`);
-    console.log(`\nSukces! Beecord zostal zainstalowany do:`);
+    console.log(`\nSuccess! Beecord has been installed to:`);
     console.log(`  Discord: ${file}`);
-    console.log(`  Katalog moda: ${targetRootDir}`);
-    console.log(`  Pliki systemowe: ${targetDataDir}`);
-    console.log(`  Wtyczki: ${targetPluginsDir}`);
-    console.log(`  Zasoby: ${targetAssetsDir}`);
-    console.log(`  Logi: ${targetLogsDir}`);
+    console.log(`  Root: ${targetRootDir}`);
+    console.log(`  System: ${targetDataDir}`);
+    console.log(`  Plugins: ${targetPluginsDir}`);
+    console.log(`  Assets: ${targetAssetsDir}`);
+    console.log(`  Logs: ${targetLogsDir}`);
 
     installWatcher();
     if (isDiscordRunning()) {
         restartDiscord();
     } else {
-        console.log("\nUruchom Discorda. Od teraz modyfikacja laduje sie automatycznie.");
+        console.log("\nLaunch Discord. From now on, the enhancement loads automatically.");
     }
 }
 
@@ -344,8 +344,8 @@ function showLog() {
         path.join(legacyDataDir, "log.txt")
     ];
     let lf = candidatePaths.find(p => fs.existsSync(p));
-    if (!lf) { console.log("Brak pliku log.txt."); return; }
-    console.log(`\n=== ZAWARTOSC LOGU (${lf}) ===\n`);
+    if (!lf) { console.log("No log.txt file found."); return; }
+    console.log(`\n=== LOG CONTENT (${lf}) ===\n`);
     console.log(fs.readFileSync(lf, "utf8"));
 }
 
@@ -355,6 +355,6 @@ try {
     else if (cmd === "log") showLog();
     else install();
 } catch (e) {
-    console.error("Blad:", e.message);
+    console.error("Error:", e.message);
     process.exit(1);
 }
