@@ -295,10 +295,6 @@ function install() {
         console.log("[4/5] Synchronizing root files...");
     }
 
-    // Ensure root proxy files exist
-    fs.writeFileSync(path.join(targetRootDir, "loader.js"), "module.exports = require('./data/loader.js');\r\n");
-    fs.writeFileSync(path.join(targetRootDir, "watcher.js"), "require(\"./data/watcher.js\");\r\n");
-
     // 5. Patch Discord core
     console.log("[5/5] Patching Discord core...");
     const loaderPath = path.join(targetDataDir, "loader.js");
