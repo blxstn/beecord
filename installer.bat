@@ -6,40 +6,33 @@ cd /d "%~dp0"
 where node >nul 2>nul
 if %errorlevel% neq 0 (
     echo.
-    echo [BLAD] Node.js nie zostal znaleziony!
+    echo [BLAD] Node.js nie zostal znaleziony w systemie!
     echo Zainstaluj Node.js ze strony https://nodejs.org i uruchom instalator ponownie.
     echo.
     pause
     exit /b 1
 )
 
-set "SCRIPT=install.js"
-if not exist "%SCRIPT%" if exist "data\install.js" set "SCRIPT=data\install.js"
+set "SCRIPT=data\install.js"
+if not exist "%SCRIPT%" if exist "install.js" set "SCRIPT=install.js"
 
-if "%~1"=="uninstall" (
-    node "%SCRIPT%" uninstall
+if not "%~1"=="" (
+    node "%SCRIPT%" %*
+    if errorlevel 1 (
+        echo.
+        echo [BLAD] Wystapil blad podczas wykonywania operacji.
+    )
     pause
-    exit /b 0
+    exit /b %errorlevel%
 )
 
-if "%~1"=="log" (
-    node "%SCRIPT%" log
-    pause
-    exit /b 0
-)
-
-if "%~1"=="install" (
-    node "%SCRIPT%" install
-    pause
-    exit /b 0
-)
-
+:MENU
 cls
 echo ======================================================
-echo                 BEECORD INSTALLER
+echo                  BEECORD INSTALLER
 echo ======================================================
 echo.
-echo   [1] Zainstaluj / Zaktualizuj Beecord
+echo   [1] Zainstaluj / Zaktualizuj Beecord (Wszystkie pliki)
 echo   [2] Odinstaluj Beecord
 echo   [3] Pokaz logi (log.txt)
 echo   [4] Wyjdz

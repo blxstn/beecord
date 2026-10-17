@@ -1,8 +1,10 @@
 # Runtime logs & temporary files
 logs/
+log.txt
 *.log
 *.pid
 inbox/
 *.bak
 *.tmp
 node_modules/
+

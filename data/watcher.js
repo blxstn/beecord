@@ -216,7 +216,7 @@ if (process.argv[2] === "--once") {
         const old = parseInt(fs.readFileSync(pidFile, "utf8"), 10);
         if (old && old !== process.pid && isNodeProcess(old)) process.exit(0);
     } catch { }
-    try { fs.mkdirSync(dataDir, { recursive: true }); fs.writeFileSync(pidFile, String(process.pid)); } catch { }
+    try { fs.mkdirSync(logsDir, { recursive: true }); fs.writeFileSync(pidFile, String(process.pid)); } catch { }
     log("watcher & auto-updater started");
 
     tickDiscord();

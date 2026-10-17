@@ -10,12 +10,28 @@ const { execFileSync, spawn } = require("child_process");
 const MARKER = "/*BEECORD*/";
 const LEGACY_MARKERS = ["/*BLXSTNCORD*/", "/*FAKECORD*/"];
 const discordDir = path.join(process.env.LOCALAPPDATA || "", "Discord");
-const dataDir = path.join(process.env.APPDATA || "", "beecord");
+
+// Target directories (%APPDATA%\beecord and organized subdirectories)
+const targetRootDir = path.join(process.env.APPDATA || "", "beecord");
+const targetDataDir = path.join(targetRootDir, "data");
+const targetPluginsDir = path.join(targetRootDir, "plugins");
+const targetAssetsDir = path.join(targetRootDir, "assets");
+const targetLogsDir = path.join(targetRootDir, "logs");
 const legacyDataDir = path.join(process.env.APPDATA || "", "blxstncord");
+
+// Source directories (where installer is being run from)
+const sourceRootDir = fs.existsSync(path.join(__dirname, "install.js")) && path.basename(__dirname).toLowerCase() === "data"
+    ? path.resolve(__dirname, "..")
+    : __dirname;
+const sourceDataDir = path.join(sourceRootDir, "data");
+const sourcePluginsDir = path.join(sourceRootDir, "plugins");
+const sourceAssetsDir = path.join(sourceRootDir, "assets");
+
+// Startup files
 const startupDir = path.join(process.env.APPDATA || "", "Microsoft", "Windows", "Start Menu", "Programs", "Startup");
 const startupFile = path.join(startupDir, "beecord-updater.vbs");
 const legacyStartupFile = path.join(startupDir, "blxstncord-updater.vbs");
-const pidFile = path.join(dataDir, "watcher.pid");
+const pidFile = path.join(targetLogsDir, "watcher.pid");
 
 function isNodeProcess(pid) {
     try {
@@ -24,7 +40,12 @@ function isNodeProcess(pid) {
 }
 
 function stopWatcher() {
-    for (const pf of [pidFile, path.join(legacyDataDir, "watcher.pid")]) {
+    const pidsToCheck = [
+        pidFile,
+        path.join(targetRootDir, "watcher.pid"),
+        path.join(legacyDataDir, "watcher.pid")
+    ];
+    for (const pf of pidsToCheck) {
         try {
             const pid = parseInt(fs.readFileSync(pf, "utf8"), 10);
             if (pid && isNodeProcess(pid)) process.kill(pid);
@@ -35,7 +56,11 @@ function stopWatcher() {
 
 function installWatcher() {
     stopWatcher();
-    const watcher = path.join(dataDir, "watcher.js");
+    const watcher = path.join(targetDataDir, "watcher.js");
+    if (!fs.existsSync(watcher)) {
+        console.log("  [WARN] watcher.js nie istnieje w " + targetDataDir);
+        return;
+    }
     const cmd = `"${process.execPath}" "${watcher}"`;
     fs.mkdirSync(startupDir, { recursive: true });
     try { fs.rmSync(legacyStartupFile, { force: true }); } catch { }
@@ -48,7 +73,36 @@ function removeWatcher() {
     stopWatcher();
     try { fs.rmSync(startupFile, { force: true }); } catch { }
     try { fs.rmSync(legacyStartupFile, { force: true }); } catch { }
-    try { fs.rmSync(path.join(dataDir, "watcher.js"), { force: true }); } catch { }
+}
+
+function safeCopyFile(src, dst) {
+    try {
+        if (path.resolve(src) === path.resolve(dst)) return false;
+        fs.mkdirSync(path.dirname(dst), { recursive: true });
+        fs.copyFileSync(src, dst);
+        return true;
+    } catch (e) {
+        console.error(`  [WARN] Nie udalo sie skopiowac ${path.basename(src)}: ${e.message}`);
+        return false;
+    }
+}
+
+function copyDirRecursive(srcDir, dstDir) {
+    if (!fs.existsSync(srcDir)) return [];
+    fs.mkdirSync(dstDir, { recursive: true });
+    const copied = [];
+    const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+    for (const entry of entries) {
+        const srcPath = path.join(srcDir, entry.name);
+        const dstPath = path.join(dstDir, entry.name);
+        if (path.resolve(srcPath) === path.resolve(dstPath)) continue;
+        if (entry.isDirectory()) {
+            copied.push(...copyDirRecursive(srcPath, dstPath));
+        } else if (entry.isFile()) {
+            if (safeCopyFile(srcPath, dstPath)) copied.push(dstPath);
+        }
+    }
+    return copied;
 }
 
 function cmpVersion(a, b) {
@@ -117,7 +171,6 @@ function isDiscordRunning() {
 
 const sleepSync = ms => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch { } };
 
-// Discord.exe of the newest app-* folder (used when Update.exe cannot start it)
 function discordExePaths() {
     try {
         return fs.readdirSync(discordDir).filter(d => /^app-/.test(d)).sort().reverse()
@@ -125,7 +178,6 @@ function discordExePaths() {
     } catch { return []; }
 }
 
-// Starts Discord and CHECKS that it is really running. Tries three ways, one after another.
 function launchDiscord() {
     const update = path.join(discordDir, "Update.exe");
     const ways = [
@@ -156,7 +208,7 @@ function restartDiscord() {
     try {
         execFileSync("taskkill", ["/f", "/t", "/im", "Discord.exe"], { windowsHide: true, stdio: "ignore" });
     } catch { }
-    for (let w = 0; w < 20 && isDiscordRunning(); w++) sleepSync(500);   // wait until it is really gone
+    for (let w = 0; w < 20 && isDiscordRunning(); w++) sleepSync(500);
     sleepSync(1500);
     if (!launchDiscord()) {
         console.log("Nie udalo sie uruchomic Discorda automatycznie. Uruchom go recznie (skrot Discord na pulpicie lub w menu Start).");
@@ -164,6 +216,9 @@ function restartDiscord() {
 }
 
 function uninstall() {
+    console.log("======================================================");
+    console.log("             ODINSTALOWYWANIE BEECORD");
+    console.log("======================================================");
     removeWatcher();
     cleanLegacy();
     cleanVencord();
@@ -176,53 +231,77 @@ function uninstall() {
             n++;
         }
     }
-    for (const f of ["loader.js", "renderer.js", "media.ps1"]) {
-        try { fs.rmSync(path.join(dataDir, f), { force: true }); } catch { }
-    }
-    console.log(n ? `Przywrocono ${n} plik(ow). Beecord zostal odinstalowany.` : "Brak aktywnych modyfikacji do usuniecia.");
+    console.log(n ? `Przywrocono ${n} plik(ow) Discorda. Beecord zostal odinstalowany.` : "Brak aktywnych modyfikacji do usuniecia w Discordzie.");
     if (isDiscordRunning()) restartDiscord();
 }
 
 function install() {
+    console.log("======================================================");
+    console.log("              INSTALACJA BEECORD");
+    console.log("======================================================");
+
     if (fs.existsSync(discordDir)) cleanVencord();
     cleanLegacy();
     const files = findCoreFiles();
     if (!files.length) throw new Error("Nie znaleziono modulu discord_desktop_core. Uruchom Discorda raz, zamknij i sprobuj ponownie.");
 
-    const targetDirs = [dataDir];
-    if (fs.existsSync(legacyDataDir)) targetDirs.push(legacyDataDir);
-
-    // Kopiuj pliki launch/systemu do %APPDATA%\beecord (oraz opcjonalnie blxstncord jesli istnieje)
-    for (const targetDir of targetDirs) {
-        fs.mkdirSync(targetDir, { recursive: true });
-        for (const f of ["loader.js", "renderer.js", "media.ps1", "watcher.js"]) {
-            const src = path.join(__dirname, f);
-            if (fs.existsSync(src)) fs.copyFileSync(src, path.join(targetDir, f));
-        }
+    // Tworzenie zorganizowanej struktury 4 podfolderow
+    for (const dir of [targetRootDir, targetDataDir, targetPluginsDir, targetAssetsDir, targetLogsDir]) {
+        fs.mkdirSync(dir, { recursive: true });
     }
 
-    const loaderPath = path.join(dataDir, "loader.js");
+    // 1. Kopiuj wszystkie pliki systemowe z folderu data
+    console.log("[1/5] Instalowanie plikow systemowych (data/)...");
+    if (fs.existsSync(sourceDataDir)) {
+        copyDirRecursive(sourceDataDir, targetDataDir);
+    }
+    const dataFiles = fs.existsSync(targetDataDir) ? fs.readdirSync(targetDataDir) : [];
+    console.log(`      Zainstalowano ${dataFiles.length} plik(ow) systemowych.`);
 
-    // Kopiuj pluginy z folderu plugins (obok lub w podkatalogu)
-    const srcPlugins = fs.existsSync(path.join(__dirname, "plugins"))
-        ? path.join(__dirname, "plugins")
-        : path.join(__dirname, "..", "plugins");
-    if (!fs.existsSync(srcPlugins)) throw new Error("Nie znaleziono folderu 'plugins'!");
+    // 2. Kopiuj wszystkie assety (ikony, zdjecia, grafiki)
+    console.log("[2/5] Instalowanie zasobow i ikon (assets/)...");
+    if (fs.existsSync(sourceAssetsDir)) {
+        copyDirRecursive(sourceAssetsDir, targetAssetsDir);
+    }
+    const assetFiles = fs.existsSync(targetAssetsDir) ? fs.readdirSync(targetAssetsDir) : [];
+    console.log(`      Zainstalowano ${assetFiles.length} plik(ow) zasobow.`);
 
-    for (const targetDir of targetDirs) {
-        const dstPlugins = path.join(targetDir, "plugins");
-        fs.mkdirSync(dstPlugins, { recursive: true });
-        for (const f of fs.readdirSync(srcPlugins).filter(f => f.endsWith(".js") && !f.startsWith("_"))) {
-            fs.copyFileSync(path.join(srcPlugins, f), path.join(dstPlugins, f));
+    // 3. Kopiuj dynamicznie WSZYSTKIE wtyczki (aktualne i nowo dodane)
+    console.log("[3/5] Instalowanie wtyczek (plugins/)...");
+    if (fs.existsSync(sourcePluginsDir)) {
+        copyDirRecursive(sourcePluginsDir, targetPluginsDir);
+    }
+    const installedPlugins = fs.existsSync(targetPluginsDir)
+        ? fs.readdirSync(targetPluginsDir).filter(f => /\.js$/i.test(f) && !f.startsWith("_") && !f.startsWith("."))
+        : [];
+    console.log(`      Wykryto i zainstalowano wtyczki (${installedPlugins.length}):`);
+    installedPlugins.forEach(p => console.log(`       -> ${p}`));
+
+    // 4. Kopiowanie wszelkich innych podfolderow uzytkownika i plikow glownych
+    if (path.resolve(sourceRootDir) !== path.resolve(targetRootDir)) {
+        console.log("[4/5] Kopiowanie plikow glownych...");
+        const ignored = new Set([".git", "logs", "inbox", "node_modules", "data", "plugins", "assets"]);
+        for (const entry of fs.readdirSync(sourceRootDir, { withFileTypes: true })) {
+            if (ignored.has(entry.name)) continue;
+            const src = path.join(sourceRootDir, entry.name);
+            const dst = path.join(targetRootDir, entry.name);
+            if (entry.isDirectory()) {
+                copyDirRecursive(src, dst);
+            } else if (entry.isFile()) {
+                safeCopyFile(src, dst);
+            }
         }
-        const template = path.join(srcPlugins, "_template.js");
-        if (fs.existsSync(template)) fs.copyFileSync(template, path.join(dstPlugins, "_template.js"));
+    } else {
+        console.log("[4/5] Synchronizacja plikow glownych...");
     }
 
-    const copiedPlugins = fs.readdirSync(srcPlugins).filter(f => f.endsWith(".js") && !f.startsWith("_"));
-    console.log("Skopiowano pluginy (" + copiedPlugins.length + "): " + copiedPlugins.join(", "));
+    // Upewnij sie, ze w katalogu glownym istnieja pliki proxy wskazujace na data/
+    fs.writeFileSync(path.join(targetRootDir, "loader.js"), "module.exports = require('./data/loader.js');\r\n");
+    fs.writeFileSync(path.join(targetRootDir, "watcher.js"), "require(\"./data/watcher.js\");\r\n");
 
-    // Spatchuj najnowsza wersje Discorda
+    // 5. Spatchuj najnowsza wersje Discorda wskazujac na targetDataDir/loader.js
+    console.log("[5/5] Patchowanie Discorda...");
+    const loaderPath = path.join(targetDataDir, "loader.js");
     const file = files[0];
     const bak = file + ".beecord.bak";
     let original = fs.readFileSync(file, "utf8");
@@ -230,7 +309,6 @@ function install() {
     if (original.startsWith(MARKER)) {
         if (fs.existsSync(bak)) original = fs.readFileSync(bak, "utf8");
     } else {
-        // Jesli jest stary marker blxstncord lub fakecord
         for (const m of LEGACY_MARKERS) {
             if (original.startsWith(m)) {
                 const oldBak = file + ".blxstncord.bak";
@@ -241,24 +319,33 @@ function install() {
     }
 
     fs.writeFileSync(file, `${MARKER}\nrequire(${JSON.stringify(loaderPath)});\n${original}`);
-    console.log(`Zainstalowano pomyslnie do:\n  ${file}\nPliki moda: ${dataDir}\nPluginy: ${path.join(dataDir, "plugins")}`);
-    
+    console.log(`\nSukces! Beecord zostal zainstalowany do:`);
+    console.log(`  Discord: ${file}`);
+    console.log(`  Katalog moda: ${targetRootDir}`);
+    console.log(`  Pliki systemowe: ${targetDataDir}`);
+    console.log(`  Wtyczki: ${targetPluginsDir}`);
+    console.log(`  Zasoby: ${targetAssetsDir}`);
+    console.log(`  Logi: ${targetLogsDir}`);
+
     installWatcher();
     if (isDiscordRunning()) {
         restartDiscord();
     } else {
-        console.log("Uruchom Discorda. Od teraz modyfikacja laduje sie automatycznie.");
+        console.log("\nUruchom Discorda. Od teraz modyfikacja laduje sie automatycznie.");
     }
 }
 
 function showLog() {
     const candidatePaths = [
-        path.join(__dirname, "..", "logs", "log.txt"),
-        path.join(dataDir, "log.txt"),
+        path.join(targetLogsDir, "log.txt"),
+        path.join(targetLogsDir, "updater.log"),
+        path.join(targetRootDir, "log.txt"),
+        path.join(targetDataDir, "log.txt"),
         path.join(legacyDataDir, "log.txt")
     ];
     let lf = candidatePaths.find(p => fs.existsSync(p));
     if (!lf) { console.log("Brak pliku log.txt."); return; }
+    console.log(`\n=== ZAWARTOSC LOGU (${lf}) ===\n`);
     console.log(fs.readFileSync(lf, "utf8"));
 }
 

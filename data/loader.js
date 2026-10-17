@@ -20,11 +20,20 @@ try { fs.writeFileSync(logFile, ""); } catch { }
 try { fs.mkdirSync(pluginsDir, { recursive: true }); } catch { }
 log("loader started");
 
-function listPlugins() {
+function listPlugins(dir = pluginsDir, prefix = "") {
     try {
-        return fs.readdirSync(pluginsDir)
-            .filter(f => /\.js$/i.test(f) && !f.startsWith("_") && !f.startsWith("."))
-            .sort();
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        const list = [];
+        for (const e of entries) {
+            if (e.name.startsWith("_") || e.name.startsWith(".")) continue;
+            if (e.isFile() && /\.js$/i.test(e.name)) {
+                list.push(prefix ? path.join(prefix, e.name).replace(/\\/g, "/") : e.name);
+            } else if (e.isDirectory()) {
+                const sub = listPlugins(path.join(dir, e.name), prefix ? path.join(prefix, e.name) : e.name);
+                list.push(...sub);
+            }
+        }
+        return list.sort();
     } catch (e) {
         log("cannot read plugins folder: " + e);
         return [];
@@ -89,10 +98,15 @@ function hotReload() {
 }
 let pluginWatcher = null;
 try {
-    pluginWatcher = fs.watch(pluginsDir, () => hotReload());
-    log("watching the plugins folder for changes");
+    pluginWatcher = fs.watch(pluginsDir, { recursive: true }, () => hotReload());
+    log("watching the plugins folder for changes (recursive)");
 } catch (e) {
-    log("cannot watch the plugins folder: " + e.message);
+    try {
+        pluginWatcher = fs.watch(pluginsDir, () => hotReload());
+        log("watching the plugins folder for changes");
+    } catch (err) {
+        log("cannot watch the plugins folder: " + err.message);
+    }
 }
 
 // ---------- media bridge (Spotify Controls plugin) ----------
